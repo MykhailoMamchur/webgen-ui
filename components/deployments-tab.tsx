@@ -73,18 +73,19 @@ export default function DeploymentsTab() {
     }
   }
 
-  // Fix the stopProject function to handle potential HTML responses
+  // Update the stopProject function to send project_name in the request body
   const stopProject = async (projectName: string) => {
     try {
       setIsLoading(true)
       setError(null)
 
-      // Updated to use the new API endpoint format
-      const response = await fetch(`/api/stop/${projectName}`, {
+      // Updated to use the correct API endpoint format with project_name in body
+      const response = await fetch("/api/stop", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ project_name: projectName }),
       })
 
       // Check if the response is JSON

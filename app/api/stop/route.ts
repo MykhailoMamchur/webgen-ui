@@ -10,12 +10,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project name is required" }, { status: 400 })
     }
 
-    // Forward the request to the new API endpoint with the project name in the URL
-    const response = await fetch(`https://wegenweb.com/api/stop/${body.project_name}`, {
+    // Forward the request to the API endpoint with project_name in the body
+    const response = await fetch("https://wegenweb.com/api/stop", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ project_name: body.project_name }),
     })
 
     // Check if the response is JSON
