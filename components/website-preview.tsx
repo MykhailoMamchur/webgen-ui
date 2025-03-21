@@ -221,7 +221,7 @@ export default function WebsitePreview({ content, directory, isGenerating, onTab
       <div className="flex items-center p-2 border-b border-border bg-[#13111C]">
         <div className="flex-1 mx-auto max-w-md">
           <div className="bg-background border border-input rounded-md px-3 py-1 text-sm text-center truncate">
-            {isServerStarted ? `/api/project/${directory}` : "preview.manufactura.ai"}
+            {isServerStarted ? `https://wegenweb.com/project/${directory}` : "preview.manufactura.ai"}
           </div>
         </div>
       </div>
@@ -252,7 +252,7 @@ export default function WebsitePreview({ content, directory, isGenerating, onTab
 
         {isServerStarted && serverPort ? (
           <iframe
-            src={`/api/project/${directory}`}
+            src={`https://wegenweb.com/project/${directory}`}
             title="Website Preview"
             className="w-full h-full border-none"
             sandbox="allow-same-origin allow-scripts"

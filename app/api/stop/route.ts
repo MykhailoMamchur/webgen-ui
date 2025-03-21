@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the request to the new API endpoint with the project name in the URL
-    const response = await fetch(`/api/stop/${body.project_name}`, {
+    const response = await fetch(`https://wegenweb.com/api/stop/${body.project_name}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

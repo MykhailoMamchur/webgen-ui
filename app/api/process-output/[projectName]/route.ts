@@ -8,8 +8,8 @@ export async function GET(request: NextRequest, { params }: { params: { projectN
       return NextResponse.json({ error: "Project name is required" }, { status: 400 })
     }
 
-    // Forward the request to the new API endpoint
-    const response = await fetch(`/api/process-output/${projectName}`, {
+    // Update the API endpoint to use wegenweb.com/api
+    const response = await fetch(`https://wegenweb.com/api/process-output/${projectName}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

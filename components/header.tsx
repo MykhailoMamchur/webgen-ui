@@ -93,31 +93,11 @@ export default function Header({
   const isPreviewEnabled = currentProject?.directory && (!isGenerating || projectStatus?.status === "running")
 
   // Handle preview button click
-  const handlePreviewClick = async () => {
+  const handlePreviewClick = () => {
     if (!currentProject?.directory) return
 
-    // Check current status before taking action
-    const currentStatus = await checkProjectStatus(currentProject.directory)
-
-    // If project is not running, start it first
-    if (!currentStatus || currentStatus.status !== "running") {
-      const newStatus = await startProject()
-
-      if (newStatus?.status === "running") {
-        window.open(`/api/project/${currentProject.directory}`, "_blank")
-      } else {
-        // Wait a moment and check again
-        setTimeout(async () => {
-          const finalStatus = await checkProjectStatus(currentProject.directory)
-          if (finalStatus?.status === "running") {
-            window.open(`/api/project/${currentProject.directory}`, "_blank")
-          }
-        }, 2000)
-      }
-    } else {
-      // If already running, open in new tab
-      window.open(`/api/project/${currentProject.directory}`, "_blank")
-    }
+    // Simply open the project in a new tab without starting it
+    window.open(`https://wegenweb.com/project/${currentProject.directory}`, "_blank")
   }
 
   return (

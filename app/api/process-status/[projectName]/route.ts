@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, { params }: { params: { projectN
     }
 
     // Forward the request to the new API endpoint
-    const response = await fetch(`/api/process-status/${projectName}`, {
+    const response = await fetch(`https://wegenweb.com/api/process-status/${projectName}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

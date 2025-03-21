@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 export async function POST(request: NextRequest) {
   try {
     // Forward the request to the new API endpoint
-    const response = await fetch("/api/stop-all", {
+    const response = await fetch("https://wegenweb.com/api/stop-all", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

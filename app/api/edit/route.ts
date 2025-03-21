@@ -19,8 +19,8 @@ export async function POST(request: NextRequest) {
       delete requestBody.directory
     }
 
-    // Forward the request to the new API endpoint
-    const response = await fetch("/api/edit", {
+    // Update the API endpoint to use wegenweb.com/api
+    const response = await fetch("https://wegenweb.com/api/edit", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

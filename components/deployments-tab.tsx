@@ -189,7 +189,7 @@ export default function DeploymentsTab() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => window.open(`/api/project/${deployment.name}`, "_blank")}
+                          onClick={() => window.open(`https://wegenweb.com/project/${deployment.name}`, "_blank")}
                           className="border-purple-900/20 text-purple-300 hover:bg-purple-500/10"
                         >
                           <ExternalLink className="h-4 w-4 mr-2" />

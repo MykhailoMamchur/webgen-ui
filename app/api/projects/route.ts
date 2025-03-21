@@ -2,8 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
-    // Use the new API endpoint
-    const response = await fetch("/api/projects", {
+    // Update the API endpoint to use wegenweb.com/api
+    const response = await fetch("https://wegenweb.com/api/projects", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

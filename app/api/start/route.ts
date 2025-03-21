@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project name is required" }, { status: 400 })
     }
 
-    // Forward the request to the new API endpoint
-    const response = await fetch("/api/start", {
+    // Update the API endpoint to use wegenweb.com/api
+    const response = await fetch("https://wegenweb.com/api/start", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
