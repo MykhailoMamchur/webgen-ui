@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 // The external API endpoint
-const EDIT_API_URL = "http://35.174.202.47:8000/edit"
+const EDIT_API_URL = "https://wegenweb.com/api/edit"
 
 // Set a longer timeout for the API route
 export const maxDuration = 3600 // 60 minutes
