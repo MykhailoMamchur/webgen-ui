@@ -18,15 +18,21 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // If the response is not ok, throw an error
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`API responded with status ${response.status}: ${errorText}`)
+    // Check if the response is JSON
+    const contentType = response.headers.get("content-type")
+    if (contentType && contentType.includes("application/json")) {
+      // If the response is JSON, parse it
+      const data = await response.json()
+      return NextResponse.json(data)
+    } else {
+      // If the response is not JSON, return a success message
+      if (response.ok) {
+        return NextResponse.json({ status: "success", message: "Project stopped successfully" })
+      } else {
+        const errorText = await response.text()
+        throw new Error(`API responded with status ${response.status}`)
+      }
     }
-
-    // Return the response
-    const data = await response.json()
-    return NextResponse.json(data)
   } catch (error) {
     console.error("Error in stop API route:", error)
     return NextResponse.json({ error: `Failed to stop server: ${(error as Error).message}` }, { status: 500 })

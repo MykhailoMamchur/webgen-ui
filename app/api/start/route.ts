@@ -24,14 +24,20 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(requestBody),
     })
 
+    // Parse the JSON response
+    const data = await response.json()
+
+    // If the API returns an error status, pass it through
+    if (data.status === "error") {
+      return NextResponse.json(data, { status: 400 })
+    }
+
     // If the response is not ok, throw an error
     if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`API responded with status ${response.status}: ${errorText}`)
+      throw new Error(`API responded with status ${response.status}`)
     }
 
     // Return the response
-    const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
     console.error("Error in start API route:", error)

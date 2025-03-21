@@ -43,9 +43,11 @@ export default function DeploymentsTab() {
     // No polling interval - only fetch when tab is opened or refresh is clicked
   }, [])
 
+  // Update the startProject function to properly handle and display error messages
   const startProject = async (projectName: string) => {
     try {
       setIsLoading(true)
+      setError(null)
 
       const response = await fetch("/api/start", {
         method: "POST",
@@ -55,9 +57,10 @@ export default function DeploymentsTab() {
         body: JSON.stringify({ project_name: projectName }),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `Failed to start project: ${response.status}`)
+      const data = await response.json()
+
+      if (!response.ok || data.status === "error") {
+        throw new Error(data.message || `Failed to start project: ${response.status}`)
       }
 
       // Refresh deployments after starting
@@ -70,9 +73,11 @@ export default function DeploymentsTab() {
     }
   }
 
+  // Fix the stopProject function to handle potential HTML responses
   const stopProject = async (projectName: string) => {
     try {
       setIsLoading(true)
+      setError(null)
 
       // Updated to use the new API endpoint format
       const response = await fetch(`/api/stop/${projectName}`, {
@@ -82,9 +87,19 @@ export default function DeploymentsTab() {
         },
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `Failed to stop project: ${response.status}`)
+      // Check if the response is JSON
+      const contentType = response.headers.get("content-type")
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json()
+        if (!response.ok || data.status === "error") {
+          throw new Error(data.message || `Failed to stop project: ${response.status}`)
+        }
+      } else {
+        // Handle non-JSON response
+        if (!response.ok) {
+          const text = await response.text()
+          throw new Error(`Failed to stop project: ${response.status}`)
+        }
       }
 
       // Refresh deployments after stopping
@@ -97,9 +112,11 @@ export default function DeploymentsTab() {
     }
   }
 
+  // Also fix the stopAllProjects function to handle potential HTML responses
   const stopAllProjects = async () => {
     try {
       setIsLoading(true)
+      setError(null)
 
       const response = await fetch("/api/stop-all", {
         method: "POST",
@@ -108,9 +125,19 @@ export default function DeploymentsTab() {
         },
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `Failed to stop all projects: ${response.status}`)
+      // Check if the response is JSON
+      const contentType = response.headers.get("content-type")
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json()
+        if (!response.ok || data.status === "error") {
+          throw new Error(data.message || `Failed to stop all projects: ${response.status}`)
+        }
+      } else {
+        // Handle non-JSON response
+        if (!response.ok) {
+          const text = await response.text()
+          throw new Error(`Failed to stop all projects: ${response.status}`)
+        }
       }
 
       // Refresh deployments after stopping all
