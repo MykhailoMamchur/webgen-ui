@@ -16,6 +16,10 @@ import { v4 as uuidv4 } from "uuid"
 // Update the DEFAULT_HTML to be empty
 const DEFAULT_HTML = ``
 
+// Initial welcome message for new projects - shorter and simpler
+const WELCOME_MESSAGE =
+  "Describe a desired website (purpose, style, content) and I'll create it for you. Use commands like /strictlayout, /noimprove, or /norefine if needed. What would you like to build today?"
+
 // Random project name generator
 const generateProjectName = (existingNames: string[] = []) => {
   const adjectives = [
@@ -173,7 +177,7 @@ const generateProjectName = (existingNames: string[] = []) => {
 }
 
 export default function Home() {
-  const [showWelcome, setShowWelcome] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(false) // Show welcome screen by default
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("generation")
   const [isExiting, setIsExiting] = useState(false)
@@ -214,7 +218,7 @@ export default function Home() {
               description: `Project ${project.name}`,
               createdAt: new Date(),
               updatedAt: new Date(),
-              directory: project.name.toLowerCase(),
+              directory: project.name, // Keep original casing
               websiteContent: DEFAULT_HTML,
               codeContent: DEFAULT_HTML,
               messages: [],
@@ -323,10 +327,15 @@ export default function Home() {
       description,
       createdAt: new Date(),
       updatedAt: new Date(),
-      directory: formattedName.toLowerCase(),
+      directory: formattedName, // Keep original casing
       websiteContent: DEFAULT_HTML,
       codeContent: DEFAULT_HTML,
-      messages: [],
+      messages: [
+        {
+          role: "assistant" as const,
+          content: WELCOME_MESSAGE,
+        },
+      ],
     }
 
     setProjects((prev) => [...prev, newProject])
@@ -380,7 +389,17 @@ export default function Home() {
       setShowWelcome(false)
 
       // Update messages
-      const newMessages = [{ role: "user" as const, content: prompt }]
+      const newMessages = [
+        {
+          role: "assistant" as const,
+          content: WELCOME_MESSAGE,
+        },
+        {
+          role: "user" as const,
+          content: prompt,
+        },
+      ]
+
       updateCurrentProject({ messages: newMessages })
 
       // Switch to the Generation tab to show streaming content
@@ -438,7 +457,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           description,
-          project_name: projectName,
+          project_name: projectName, // Use original casing
         }),
         signal: controller.signal,
       })
@@ -569,7 +588,7 @@ export default function Home() {
     description: p.description,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
-    directory: p.directory,
+    directory: p.directory, // Keep original casing
   }))
 
   const currentProjectSummary = currentProjectId
@@ -589,6 +608,19 @@ export default function Home() {
     }
 
     setCurrentProjectId(projectId)
+
+    // Add welcome message if the project has no messages
+    const selectedProject = projects.find((p) => p.id === projectId)
+    if (selectedProject && (!selectedProject.messages || selectedProject.messages.length === 0)) {
+      updateCurrentProject({
+        messages: [
+          {
+            role: "assistant" as const,
+            content: WELCOME_MESSAGE,
+          },
+        ],
+      })
+    }
   }
 
   // Fix the width issues by adding a min-width to the main content area
@@ -609,6 +641,8 @@ export default function Home() {
             onSendMessage={handleSendMessage}
             isGenerating={isGenerating}
             onAbortGeneration={abortGeneration}
+            noProjectSelected={!currentProjectId}
+            onCreateProject={() => setIsNewProjectModalOpen(true)}
           />
           <div className="flex-1 flex flex-col w-full min-w-0">
             <Tabs

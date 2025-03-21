@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { Send, Square } from "lucide-react"
+import { Send, Square, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -11,6 +11,8 @@ interface ChatSidebarProps {
   onSendMessage: (message: string) => void
   isGenerating?: boolean
   onAbortGeneration?: () => void
+  noProjectSelected?: boolean
+  onCreateProject?: () => void
 }
 
 export default function ChatSidebar({
@@ -18,12 +20,21 @@ export default function ChatSidebar({
   onSendMessage,
   isGenerating = false,
   onAbortGeneration,
+  noProjectSelected = false,
+  onCreateProject,
 }: ChatSidebarProps) {
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    // If no project is selected, show create project prompt
+    if (noProjectSelected && onCreateProject) {
+      onCreateProject()
+      return
+    }
+
     if (isGenerating && onAbortGeneration) {
       onAbortGeneration()
       return
@@ -43,22 +54,35 @@ export default function ChatSidebar({
   return (
     <div className="w-[300px] min-w-[300px] border-r border-purple-900/20 bg-[#13111C] flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2`}
-          >
-            <div
-              className={`max-w-[85%] rounded-xl px-5 py-3 text-sm leading-relaxed ${
-                message.role === "user"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-500/10"
-                  : "bg-purple-500/10 text-purple-50"
-              }`}
-            >
-              {message.content}
+        {noProjectSelected ? (
+          <div className="flex flex-col items-center justify-center h-full text-center p-4">
+            <div className="bg-purple-500/10 rounded-lg p-6 mb-4">
+              <h3 className="text-lg font-medium text-white mb-2">No Project Selected</h3>
+              <p className="text-gray-300 mb-4">Create or select a project to start generating a website.</p>
+              <Button onClick={onCreateProject} className="bg-purple-600 hover:bg-purple-500 text-white">
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Project
+              </Button>
             </div>
           </div>
-        ))}
+        ) : (
+          messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2`}
+            >
+              <div
+                className={`max-w-[85%] rounded-xl px-5 py-3 text-sm leading-relaxed ${
+                  message.role === "user"
+                    ? "bg-purple-600 text-white shadow-lg shadow-purple-500/10"
+                    : "bg-purple-500/10 text-purple-50"
+                } whitespace-pre-line`}
+              >
+                {message.content}
+              </div>
+            </div>
+          ))
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -67,7 +91,13 @@ export default function ChatSidebar({
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isGenerating ? "Generation in progress..." : "Type your message..."}
+            placeholder={
+              noProjectSelected
+                ? "Create a project to start..."
+                : isGenerating
+                  ? "Generation in progress..."
+                  : "Describe your website or request changes..."
+            }
             className="min-h-[80px] resize-none bg-gray-200 dark:bg-gray-300 text-gray-900 border-0 rounded-xl placeholder:text-gray-600 focus-visible:ring-purple-500/30"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -80,10 +110,19 @@ export default function ChatSidebar({
           <Button
             type="submit"
             className={`self-end ${
-              isGenerating ? "bg-red-600 hover:bg-red-500" : "bg-purple-600 hover:bg-purple-500"
+              noProjectSelected
+                ? "bg-purple-600 hover:bg-purple-500"
+                : isGenerating
+                  ? "bg-red-600 hover:bg-red-500"
+                  : "bg-purple-600 hover:bg-purple-500"
             } text-white shadow-lg shadow-purple-500/20 rounded-xl px-6`}
           >
-            {isGenerating ? (
+            {noProjectSelected ? (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                New Project
+              </>
+            ) : isGenerating ? (
               <>
                 <Square className="h-4 w-4 mr-2" />
                 Stop

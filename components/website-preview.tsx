@@ -76,7 +76,7 @@ export default function WebsitePreview({ content, directory, isGenerating, onTab
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_name: directory }),
+        body: JSON.stringify({ project_name: directory }), // Use original casing
       })
 
       if (!response.ok) {
