@@ -197,6 +197,54 @@ export default function Home() {
   const codeContent = currentProject?.codeContent || DEFAULT_HTML
   const projectName = currentProject?.name || ""
 
+  // Function to save a message to the server
+  const saveMessageToServer = async (projectName: string, message: { role: "user" | "assistant"; content: string }) => {
+    try {
+      const response = await fetch("/api/chat/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          project_name: projectName,
+          message: message,
+        }),
+      })
+
+      if (!response.ok) {
+        console.error("Failed to save message to server:", await response.text())
+      }
+    } catch (error) {
+      console.error("Error saving message to server:", error)
+    }
+  }
+
+  // Function to load messages from the server
+  const loadMessagesFromServer = async (projectName: string) => {
+    try {
+      const response = await fetch("/api/chat/load", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          project_name: projectName,
+        }),
+      })
+
+      if (!response.ok) {
+        console.error("Failed to load messages from server:", await response.text())
+        return []
+      }
+
+      const data = await response.json()
+      return data.messages || []
+    } catch (error) {
+      console.error("Error loading messages from server:", error)
+      return []
+    }
+  }
+
   // Handle tab changes to trigger status checks only when needed
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId)
@@ -295,22 +343,24 @@ export default function Home() {
       setAbortController(null)
 
       // Add a system message indicating the generation was stopped
-      if (currentProjectId) {
+      if (currentProjectId && currentProject) {
+        const abortMessage = {
+          role: "assistant" as const,
+          content: "Generation stopped by user.",
+        }
+
         updateCurrentProject({
-          messages: [
-            ...messages,
-            {
-              role: "assistant" as const,
-              content: "Generation stopped by user.",
-            },
-          ],
+          messages: [...messages, abortMessage],
         })
+
+        // Save the abort message to the server
+        saveMessageToServer(currentProject.directory, abortMessage)
       }
     }
   }
 
   // Create a new project with a random name
-  const createProject = (name: string, description: string) => {
+  const createProject = async (name: string, description: string) => {
     // Abort any ongoing generation
     if (abortController) {
       abortController.abort()
@@ -321,6 +371,11 @@ export default function Home() {
     // Ensure the name doesn't have spaces
     const formattedName = name.trim().replace(/\s+/g, "-")
 
+    const welcomeMessage = {
+      role: "assistant" as const,
+      content: WELCOME_MESSAGE,
+    }
+
     const newProject: Project = {
       id: uuidv4(),
       name: formattedName,
@@ -330,16 +385,14 @@ export default function Home() {
       directory: formattedName, // Keep original casing
       websiteContent: DEFAULT_HTML,
       codeContent: DEFAULT_HTML,
-      messages: [
-        {
-          role: "assistant" as const,
-          content: WELCOME_MESSAGE,
-        },
-      ],
+      messages: [welcomeMessage],
     }
 
     setProjects((prev) => [...prev, newProject])
     setCurrentProjectId(newProject.id)
+
+    // Save the welcome message to the server
+    await saveMessageToServer(formattedName, welcomeMessage)
   }
 
   // Delete a project
@@ -382,11 +435,19 @@ export default function Home() {
       // Create a project with a random name
       const existingNames = projects.map((p) => p.name)
       const projectName = generateProjectName(existingNames)
-      createProject(projectName, prompt.substring(0, 100))
+      await createProject(projectName, prompt.substring(0, 100))
     }
 
     setTimeout(async () => {
       setShowWelcome(false)
+
+      if (!currentProject) return
+
+      // Create user message
+      const userMessage = {
+        role: "user" as const,
+        content: prompt,
+      }
 
       // Update messages
       const newMessages = [
@@ -394,13 +455,13 @@ export default function Home() {
           role: "assistant" as const,
           content: WELCOME_MESSAGE,
         },
-        {
-          role: "user" as const,
-          content: prompt,
-        },
+        userMessage,
       ]
 
       updateCurrentProject({ messages: newMessages })
+
+      // Save the user message to the server
+      await saveMessageToServer(currentProject.directory, userMessage)
 
       // Switch to the Generation tab to show streaming content
       setActiveTab("generation")
@@ -409,17 +470,19 @@ export default function Home() {
       await generateContent(prompt)
 
       // Add assistant response after generation is complete if no error occurred
-      if (!generationError) {
+      if (!generationError && currentProject) {
+        const assistantResponse = {
+          role: "assistant" as const,
+          content:
+            "I've generated a website based on your vision. You can see the preview and the code. Let me know if you'd like to make any changes!",
+        }
+
         updateCurrentProject({
-          messages: [
-            ...newMessages,
-            {
-              role: "assistant" as const,
-              content:
-                "I've generated a website based on your vision. You can see the preview and the code. Let me know if you'd like to make any changes!",
-            },
-          ],
+          messages: [...newMessages, assistantResponse],
         })
+
+        // Save the assistant response to the server
+        await saveMessageToServer(currentProject.directory, assistantResponse)
       }
 
       // Don't switch to preview tab automatically
@@ -429,7 +492,7 @@ export default function Home() {
 
   // Replace the generateContent function with this version that uses /edit for both initial generation and edits
   const generateContent = async (description: string) => {
-    if (!currentProjectId || !projectName) return
+    if (!currentProjectId || !projectName || !currentProject) return
 
     try {
       // Reset error state
@@ -532,16 +595,18 @@ export default function Home() {
         })
 
         // Add an error message to the chat
-        if (currentProjectId) {
+        if (currentProjectId && currentProject) {
+          const errorResponse = {
+            role: "assistant" as const,
+            content: `Sorry, I encountered an error while generating content: ${errorMessage}. Please try again.`,
+          }
+
           updateCurrentProject({
-            messages: [
-              ...messages,
-              {
-                role: "assistant" as const,
-                content: `Sorry, I encountered an error while generating content: ${errorMessage}. Please try again.`,
-              },
-            ],
+            messages: [...messages, errorResponse],
           })
+
+          // Save the error message to the server
+          await saveMessageToServer(currentProject.directory, errorResponse)
         }
       }
       setIsGenerating(false)
@@ -551,27 +616,38 @@ export default function Home() {
 
   // Remove the editContent function and update handleSendMessage to use generateContent
   const handleSendMessage = async (message: string) => {
-    if (!currentProjectId) return
+    if (!currentProjectId || !currentProject) return
+
+    // Create user message
+    const userMessage = {
+      role: "user" as const,
+      content: message,
+    }
 
     // Add user message
-    const updatedMessages = [...messages, { role: "user" as const, content: message }]
+    const updatedMessages = [...messages, userMessage]
     updateCurrentProject({ messages: updatedMessages })
+
+    // Save the user message to the server
+    await saveMessageToServer(currentProject.directory, userMessage)
 
     // Generate new content based on the message
     await generateContent(message)
 
     // Add assistant response if no error occurred
-    if (!generationError) {
+    if (!generationError && currentProject) {
+      const assistantResponse = {
+        role: "assistant" as const,
+        content:
+          "I've updated the website based on your feedback. Take a look at the preview and let me know what you think!",
+      }
+
       updateCurrentProject({
-        messages: [
-          ...updatedMessages,
-          {
-            role: "assistant" as const,
-            content:
-              "I've updated the website based on your feedback. Take a look at the preview and let me know what you think!",
-          },
-        ],
+        messages: [...updatedMessages, assistantResponse],
       })
+
+      // Save the assistant response to the server
+      await saveMessageToServer(currentProject.directory, assistantResponse)
     }
   }
 
@@ -596,7 +672,7 @@ export default function Home() {
     : null
 
   // Add this function to handle project selection with abort
-  const handleSelectProject = (projectId: string) => {
+  const handleSelectProject = async (projectId: string) => {
     // Don't allow project selection during generation
     if (isGenerating) return
 
@@ -607,19 +683,55 @@ export default function Home() {
       setAbortController(null)
     }
 
+    const selectedProject = projects.find((p) => p.id === projectId)
+    if (!selectedProject) return
+
     setCurrentProjectId(projectId)
 
-    // Add welcome message if the project has no messages
-    const selectedProject = projects.find((p) => p.id === projectId)
-    if (selectedProject && (!selectedProject.messages || selectedProject.messages.length === 0)) {
-      updateCurrentProject({
-        messages: [
-          {
-            role: "assistant" as const,
-            content: WELCOME_MESSAGE,
-          },
-        ],
-      })
+    // Load messages from the server
+    try {
+      const serverMessages = await loadMessagesFromServer(selectedProject.directory)
+
+      if (serverMessages && serverMessages.length > 0) {
+        // If server has messages, use them
+        updateCurrentProject({
+          messages: serverMessages,
+        })
+      } else if (!selectedProject.messages || selectedProject.messages.length === 0) {
+        // If no messages on server or in local state, add welcome message
+        const welcomeMessage = {
+          role: "assistant" as const,
+          content: WELCOME_MESSAGE,
+        }
+
+        updateCurrentProject({
+          messages: [welcomeMessage],
+        })
+
+        // Save the welcome message to the server
+        await saveMessageToServer(selectedProject.directory, welcomeMessage)
+      }
+    } catch (error) {
+      console.error("Error loading messages for project:", error)
+
+      // Fallback to local messages or add welcome message if none exist
+      if (!selectedProject.messages || selectedProject.messages.length === 0) {
+        const welcomeMessage = {
+          role: "assistant" as const,
+          content: WELCOME_MESSAGE,
+        }
+
+        updateCurrentProject({
+          messages: [welcomeMessage],
+        })
+
+        // Try to save the welcome message to the server
+        try {
+          await saveMessageToServer(selectedProject.directory, welcomeMessage)
+        } catch (saveError) {
+          console.error("Error saving welcome message:", saveError)
+        }
+      }
     }
   }
 
