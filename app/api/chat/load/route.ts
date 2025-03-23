@@ -27,9 +27,24 @@ export async function POST(request: NextRequest) {
       throw new Error(`API responded with status ${response.status}: ${errorText}`)
     }
 
-    // Return the response
+    // Add validation for the response data
     const data = await response.json()
-    return NextResponse.json(data)
+
+    // Validate that the messages have the correct structure
+    if (data.messages && Array.isArray(data.messages)) {
+      // Ensure each message has the required properties
+      const validMessages = data.messages.filter(
+        (msg: any) =>
+          msg &&
+          typeof msg === "object" &&
+          (msg.role === "user" || msg.role === "assistant") &&
+          typeof msg.content === "string",
+      )
+
+      return NextResponse.json({ messages: validMessages })
+    } else {
+      return NextResponse.json({ messages: [] })
+    }
   } catch (error) {
     console.error("Error in chat/load API route:", error)
     return NextResponse.json({ error: `Failed to load messages: ${(error as Error).message}` }, { status: 500 })

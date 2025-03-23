@@ -207,7 +207,10 @@ export default function Home() {
         },
         body: JSON.stringify({
           project_name: projectName,
-          message: message,
+          message: {
+            role: message.role,
+            content: message.content,
+          },
         }),
       })
 
@@ -238,7 +241,20 @@ export default function Home() {
       }
 
       const data = await response.json()
-      return data.messages || []
+
+      // Validate the messages array
+      if (data.messages && Array.isArray(data.messages)) {
+        // Ensure each message has the correct structure
+        return data.messages.filter(
+          (msg: any) =>
+            msg &&
+            typeof msg === "object" &&
+            (msg.role === "user" || msg.role === "assistant") &&
+            typeof msg.content === "string",
+        )
+      }
+
+      return []
     } catch (error) {
       console.error("Error loading messages from server:", error)
       return []
