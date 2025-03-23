@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the request to the API endpoint
-    const response = await fetch("https://wegenweb.com/api/chat/load", {
+    const response = await fetch("https://wegenweb.com/api/logs/load", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -30,13 +30,10 @@ export async function POST(request: NextRequest) {
     // Parse the response data
     const data = await response.json()
 
-    // Simply pass through the messages from the server
+    // Return the logs data
     return NextResponse.json(data)
   } catch (error) {
-    return NextResponse.json(
-      { error: `Failed to load messages: ${(error as Error).message}`, messages: [] },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: `Failed to load logs: ${(error as Error).message}`, logs: "" }, { status: 500 })
   }
 }
 

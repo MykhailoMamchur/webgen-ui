@@ -236,7 +236,6 @@ export default function Home() {
       })
 
       if (!response.ok) {
-        console.error("Failed to load messages from server:", await response.text())
         return []
       }
 
@@ -249,8 +248,37 @@ export default function Home() {
 
       return []
     } catch (error) {
-      console.error("Error loading messages from server:", error)
       return []
+    }
+  }
+
+  // Function to load logs from the server
+  const loadLogsFromServer = async (projectName: string) => {
+    try {
+      const response = await fetch("/api/logs/load", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          project_name: projectName,
+        }),
+      })
+
+      if (!response.ok) {
+        return ""
+      }
+
+      const data = await response.json()
+
+      // Check if data.logs exists
+      if (data.logs) {
+        return data.logs
+      }
+
+      return ""
+    } catch (error) {
+      return ""
     }
   }
 
@@ -516,7 +544,9 @@ export default function Home() {
       const controller = new AbortController()
       setAbortController(controller)
       setIsGenerating(true)
-      updateCurrentProject({ codeContent: "" }) // Clear existing content
+
+      // Store the current code content to append to it
+      const existingCode = currentProject.codeContent
 
       // Switch to generation tab
       setActiveTab("generation")
@@ -566,16 +596,16 @@ export default function Home() {
           if (filteredChunk) {
             generatedCode += filteredChunk
 
-            // Update the project with the new content
+            // Update the project with the new content - APPEND instead of overwrite
             updateCurrentProject({
-              codeContent: generatedCode,
-              websiteContent: generatedCode,
+              codeContent: existingCode + generatedCode,
+              websiteContent: generatedCode, // Website content is still just the new content
             })
           }
         }
       } catch (error) {
         if ((error as Error).name === "AbortError") {
-          console.log("Generation aborted")
+          // Generation aborted
         } else {
           throw error
         }
@@ -592,15 +622,14 @@ export default function Home() {
     } catch (error) {
       // Check if this was an abort error
       if ((error as Error).name === "AbortError") {
-        console.log("Generation aborted")
+        // Generation aborted
       } else {
-        console.error("Error generating content:", error)
         const errorMessage = (error as Error).message || "Failed to generate content"
         setGenerationError(errorMessage)
 
         // Update the project with the error message
         updateCurrentProject({
-          codeContent: `Error: ${errorMessage}. Please try again.`,
+          codeContent: currentProject.codeContent + `\n\nError: ${errorMessage}. Please try again.`,
         })
 
         // Add an error message to the chat
@@ -698,20 +727,33 @@ export default function Home() {
     // First set the current project ID so the UI updates immediately
     setCurrentProjectId(projectId)
 
-    // Load messages from the server
+    // Load both messages and logs from the server
     try {
+      // Load messages
       const serverMessages = await loadMessagesFromServer(selectedProject.directory)
-      console.log("Loaded messages from server:", serverMessages)
 
-      if (serverMessages && serverMessages.length > 0) {
-        // If server has messages, use them
-        // Create a direct update to ensure the messages are set correctly
-        setProjects((prevProjects) =>
-          prevProjects.map((project) =>
-            project.id === projectId ? { ...project, messages: serverMessages } : project,
-          ),
-        )
-      } else if (!selectedProject.messages || selectedProject.messages.length === 0) {
+      // Load logs
+      const serverLogs = await loadLogsFromServer(selectedProject.directory)
+
+      // Update project with messages and logs
+      setProjects((prevProjects) =>
+        prevProjects.map((project) => {
+          if (project.id === projectId) {
+            return {
+              ...project,
+              messages: serverMessages && serverMessages.length > 0 ? serverMessages : project.messages,
+              codeContent: serverLogs || project.codeContent,
+            }
+          }
+          return project
+        }),
+      )
+
+      // If no messages, add welcome message
+      if (
+        (!serverMessages || serverMessages.length === 0) &&
+        (!selectedProject.messages || selectedProject.messages.length === 0)
+      ) {
         // If no messages on server or in local state, add welcome message
         const welcomeMessage = {
           role: "assistant" as const,
@@ -728,8 +770,6 @@ export default function Home() {
         await saveMessageToServer(selectedProject.directory, welcomeMessage)
       }
     } catch (error) {
-      console.error("Error loading messages for project:", error)
-
       // Fallback to local messages or add welcome message if none exist
       if (!selectedProject.messages || selectedProject.messages.length === 0) {
         const welcomeMessage = {
@@ -747,7 +787,7 @@ export default function Home() {
         try {
           await saveMessageToServer(selectedProject.directory, welcomeMessage)
         } catch (saveError) {
-          console.error("Error saving welcome message:", saveError)
+          // Handle error silently
         }
       }
     }
