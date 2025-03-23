@@ -242,16 +242,9 @@ export default function Home() {
 
       const data = await response.json()
 
-      // Validate the messages array
+      // Check if data.messages exists and is an array
       if (data.messages && Array.isArray(data.messages)) {
-        // Ensure each message has the correct structure
-        return data.messages.filter(
-          (msg: any) =>
-            msg &&
-            typeof msg === "object" &&
-            (msg.role === "user" || msg.role === "assistant") &&
-            typeof msg.content === "string",
-        )
+        return data.messages
       }
 
       return []
@@ -702,17 +695,22 @@ export default function Home() {
     const selectedProject = projects.find((p) => p.id === projectId)
     if (!selectedProject) return
 
+    // First set the current project ID so the UI updates immediately
     setCurrentProjectId(projectId)
 
     // Load messages from the server
     try {
       const serverMessages = await loadMessagesFromServer(selectedProject.directory)
+      console.log("Loaded messages from server:", serverMessages)
 
       if (serverMessages && serverMessages.length > 0) {
         // If server has messages, use them
-        updateCurrentProject({
-          messages: serverMessages,
-        })
+        // Create a direct update to ensure the messages are set correctly
+        setProjects((prevProjects) =>
+          prevProjects.map((project) =>
+            project.id === projectId ? { ...project, messages: serverMessages } : project,
+          ),
+        )
       } else if (!selectedProject.messages || selectedProject.messages.length === 0) {
         // If no messages on server or in local state, add welcome message
         const welcomeMessage = {
@@ -720,9 +718,11 @@ export default function Home() {
           content: WELCOME_MESSAGE,
         }
 
-        updateCurrentProject({
-          messages: [welcomeMessage],
-        })
+        setProjects((prevProjects) =>
+          prevProjects.map((project) =>
+            project.id === projectId ? { ...project, messages: [welcomeMessage] } : project,
+          ),
+        )
 
         // Save the welcome message to the server
         await saveMessageToServer(selectedProject.directory, welcomeMessage)
@@ -737,9 +737,11 @@ export default function Home() {
           content: WELCOME_MESSAGE,
         }
 
-        updateCurrentProject({
-          messages: [welcomeMessage],
-        })
+        setProjects((prevProjects) =>
+          prevProjects.map((project) =>
+            project.id === projectId ? { ...project, messages: [welcomeMessage] } : project,
+          ),
+        )
 
         // Try to save the welcome message to the server
         try {

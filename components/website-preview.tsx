@@ -28,12 +28,41 @@ export default function WebsitePreview({ content, directory, isGenerating, onTab
   const [hasGeneratedContent, setHasGeneratedContent] = useState(false)
   const [projectStatus, setProjectStatus] = useState<ProjectStatus | null>(null)
 
-  // Check project status
+  // Update the checkProjectStatus function to handle the API error gracefully
   const checkProjectStatus = async () => {
     if (!directory) return null
 
     try {
-      const response = await fetch(`/api/process-status/${directory}`)
+      // Try the new API endpoint format first
+      let response = await fetch(`/api/projects`)
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.projects && Array.isArray(data.projects)) {
+          // Find the project with matching directory
+          const projectData = data.projects.find((p: any) => p.name === directory)
+          if (projectData) {
+            // Convert to the expected format
+            const status = {
+              status: projectData.status || "stopped",
+              pid: projectData.pid,
+              port: projectData.port,
+              message: projectData.status === "running" ? "Project is running" : "Project is stopped",
+            }
+            setProjectStatus(status)
+
+            if (status.status === "running" && status.port) {
+              setIsServerStarted(true)
+              setServerPort(status.port)
+              return status
+            }
+            return status
+          }
+        }
+      }
+
+      // Fall back to the old endpoint if needed
+      response = await fetch(`/api/process-status/${directory}`)
       if (response.ok) {
         const data = await response.json()
         setProjectStatus(data)
@@ -43,7 +72,9 @@ export default function WebsitePreview({ content, directory, isGenerating, onTab
           setServerPort(data.port)
           return data
         }
+        return data
       }
+
       return null
     } catch (error) {
       console.error("Error checking project status:", error)

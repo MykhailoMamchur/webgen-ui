@@ -50,16 +50,42 @@ export default function Header({
   // Function to check project status
   const checkProjectStatus = async (directory: string) => {
     try {
-      const response = await fetch(`/api/process-status/${directory}`)
+      // Try the new API endpoint format first
+      let response = await fetch(`/api/projects`)
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.projects && Array.isArray(data.projects)) {
+          // Find the project with matching directory
+          const projectData = data.projects.find((p: any) => p.name === directory)
+          if (projectData) {
+            // Convert to the expected format
+            const status = {
+              status: projectData.status || "stopped",
+              pid: projectData.pid,
+              port: projectData.port,
+              message: projectData.status === "running" ? "Project is running" : "Project is stopped",
+            }
+            setProjectStatus(status)
+            return status
+          }
+        }
+      }
+
+      // Fall back to the old endpoint if needed
+      response = await fetch(`/api/process-status/${directory}`)
       if (response.ok) {
         const data = await response.json()
         setProjectStatus(data)
         return data
       }
+
+      // If both fail, set a default status
+      setProjectStatus({ status: "stopped", message: "Unable to determine project status" })
       return null
     } catch (error) {
       console.error("Error checking project status:", error)
-      setProjectStatus(null)
+      setProjectStatus({ status: "stopped", message: "Error checking status" })
       return null
     }
   }

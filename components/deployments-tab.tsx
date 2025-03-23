@@ -28,10 +28,22 @@ export default function DeploymentsTab() {
 
       // The API now directly returns projects with their status
       const data = await response.json()
-      setDeployments(data.projects)
+
+      if (data.projects && Array.isArray(data.projects)) {
+        // Map the projects to the expected format
+        const formattedDeployments = data.projects.map((project: any) => ({
+          name: project.name,
+          status: project.status || "stopped",
+          port: project.port || null,
+        }))
+        setDeployments(formattedDeployments)
+      } else {
+        setDeployments([])
+      }
     } catch (error) {
       console.error("Error fetching deployments:", error)
       setError((error as Error).message || "Failed to fetch deployments")
+      setDeployments([])
     } finally {
       setIsLoading(false)
     }
