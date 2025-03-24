@@ -24,6 +24,8 @@ export default function ProjectSelector({
 }: ProjectSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  // Add a new state for tracking which project is being deleted
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -83,15 +85,23 @@ export default function ProjectSelector({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 ml-1 text-gray-400 hover:text-red-400"
+                          className={`h-6 w-6 ml-1 text-gray-400 hover:text-red-400 ${deletingProjectId === project.id ? "opacity-50" : ""}`}
                           onClick={(e) => {
                             e.stopPropagation()
                             if (confirm("Are you sure you want to delete this project?")) {
-                              onDeleteProject(project.id)
+                              setDeletingProjectId(project.id)
+                              onDeleteProject(project.id).finally(() => {
+                                setDeletingProjectId(null)
+                              })
                             }
                           }}
+                          disabled={deletingProjectId === project.id}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          {deletingProjectId === project.id ? (
+                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />
+                          ) : (
+                            <Trash2 className="h-3 w-3" />
+                          )}
                         </Button>
                       )}
                     </div>

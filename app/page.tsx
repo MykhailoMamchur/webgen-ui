@@ -433,17 +433,43 @@ export default function Home() {
   }
 
   // Delete a project
-  const deleteProject = (projectId: string) => {
-    setProjects((prev) => prev.filter((p) => p.id !== projectId))
+  const deleteProject = async (projectId: string): Promise<void> => {
+    const projectToDelete = projects.find((p) => p.id === projectId)
+    if (!projectToDelete) return
 
-    // If the deleted project is the current one, select another one
-    if (currentProjectId === projectId) {
-      const remainingProjects = projects.filter((p) => p.id !== projectId)
-      if (remainingProjects.length > 0) {
-        setCurrentProjectId(remainingProjects[0].id)
-      } else {
-        setCurrentProjectId(null)
+    try {
+      // Call the API to delete the project on the server
+      const response = await fetch("/api/project/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          project_name: projectToDelete.directory,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to delete project: ${response.status}`)
       }
+
+      // Remove the project from local state
+      setProjects((prev) => prev.filter((p) => p.id !== projectId))
+
+      // If the deleted project is the current one, select another one
+      if (currentProjectId === projectId) {
+        const remainingProjects = projects.filter((p) => p.id !== projectId)
+        if (remainingProjects.length > 0) {
+          setCurrentProjectId(remainingProjects[0].id)
+        } else {
+          setCurrentProjectId(null)
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting project:", error)
+      alert(`Failed to delete project: ${(error as Error).message}`)
+      throw error // Re-throw to propagate to the UI
     }
   }
 

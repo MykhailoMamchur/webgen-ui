@@ -12,7 +12,7 @@ interface HeaderProps {
   projects: ProjectSummary[]
   onSelectProject: (projectId: string) => void
   onNewProject: () => void
-  onDeleteProject: (projectId: string) => void
+  onDeleteProject: (projectId: string) => Promise<void>
   isGenerating?: boolean
 }
 
