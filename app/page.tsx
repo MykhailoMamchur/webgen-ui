@@ -177,7 +177,17 @@ const generateProjectName = (existingNames: string[] = []) => {
   return `project-${Math.floor(Math.random() * 10000)}`
 }
 
+// Add the SelectedElement interface
+interface SelectedElement {
+  selector: string
+  html: string
+}
+
+// Update the Home component to handle selected elements
 export default function Home() {
+  // Add state for selected elements
+  const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([])
+
   const [showWelcome, setShowWelcome] = useState(false) // Show welcome screen by default
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("generation")
@@ -579,16 +589,24 @@ export default function Home() {
       setActiveTab("generation")
 
       // Use the edit API for both initial generation and edits
+      // Include selected elements in the request if available
+      const requestBody: any = {
+        description,
+        project_name: projectName, // Use original casing
+      }
+
+      // Add selected elements to the request if available
+      if (selectedElements.length > 0) {
+        requestBody.selected_elements = selectedElements
+      }
+
       // Pass the abort signal to ensure server-side processing stops when aborted
       const response = await fetch("/api/edit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          description,
-          project_name: projectName, // Use original casing
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       })
 
@@ -681,6 +699,11 @@ export default function Home() {
     }
   }
 
+  // Add a handler for selected elements
+  const handleElementsSelected = (elements: SelectedElement[]) => {
+    setSelectedElements(elements)
+  }
+
   // Remove the editContent function and update handleSendMessage to use generateContent
   const handleSendMessage = async (message: string) => {
     if (!currentProjectId || !currentProject) return
@@ -700,6 +723,9 @@ export default function Home() {
 
     // Generate new content based on the message
     await generateContent(message)
+
+    // Clear selected elements after sending
+    setSelectedElements([])
 
     // Add assistant response if no error occurred
     if (!generationError && currentProject) {
@@ -843,6 +869,8 @@ export default function Home() {
             onAbortGeneration={abortGeneration}
             noProjectSelected={!currentProjectId}
             onCreateProject={() => setIsNewProjectModalOpen(true)}
+            selectedElementsCount={selectedElements.length}
+            onClearSelectedElements={() => setSelectedElements([])}
           />
           <div className="flex-1 flex flex-col w-full min-w-0">
             <Tabs
@@ -864,6 +892,7 @@ export default function Home() {
                       // Status check will happen inside the component
                     }
                   }}
+                  onElementsSelected={handleElementsSelected}
                 />
               ) : activeTab === "project-files" ? (
                 <ProjectFilesTab projectName={currentProject?.directory || ""} />

@@ -2,12 +2,29 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
+// Add imports for the selection mode button
+import { Pointer, X } from "lucide-react"
 
+// Add type definition for the extended Window interface
+declare global {
+  interface Window {
+    selectionModeCleanup?: () => void
+  }
+}
+
+// Update the WebsitePreviewProps interface to include selected elements
 interface WebsitePreviewProps {
   content: string
   directory: string
   isGenerating: boolean
   onTabActivated?: () => void
+  onElementsSelected?: (elements: SelectedElement[]) => void
+}
+
+// Add a new interface for selected elements
+interface SelectedElement {
+  selector: string
+  html: string
 }
 
 interface ProjectStatus {
@@ -19,7 +36,14 @@ interface ProjectStatus {
   exit_code?: number
 }
 
-export default function WebsitePreview({ content, directory, isGenerating, onTabActivated }: WebsitePreviewProps) {
+// Update the WebsitePreview component to include selection mode
+export default function WebsitePreview({
+  content,
+  directory,
+  isGenerating,
+  onTabActivated,
+  onElementsSelected,
+}: WebsitePreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isServerStarted, setIsServerStarted] = useState(false)
@@ -27,6 +51,10 @@ export default function WebsitePreview({ content, directory, isGenerating, onTab
   const [error, setError] = useState<string | null>(null)
   const [hasGeneratedContent, setHasGeneratedContent] = useState(false)
   const [projectStatus, setProjectStatus] = useState<ProjectStatus | null>(null)
+  // Add state for selection mode
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([])
+  const [iframeLoaded, setIframeLoaded] = useState(false)
 
   // Update the checkProjectStatus function to handle the API error gracefully
   const checkProjectStatus = async () => {
@@ -246,16 +274,302 @@ export default function WebsitePreview({ content, directory, isGenerating, onTab
     }
   }, [isServerStarted, hasGeneratedContent])
 
+  // Add a function to toggle selection mode
+  const toggleSelectionMode = () => {
+    try {
+      if (!iframeRef.current || !iframeLoaded) {
+        console.warn("Iframe not ready yet")
+        return
+      }
+
+      if (isSelectionMode) {
+        disableSelectionMode()
+      } else {
+        enableSelectionMode()
+      }
+      setIsSelectionMode(!isSelectionMode)
+    } catch (error) {
+      console.error("Error toggling selection mode:", error)
+    }
+  }
+
+  // Function to enable selection mode
+  const enableSelectionMode = () => {
+    try {
+      if (!iframeRef.current || !iframeRef.current.contentWindow) {
+        console.warn("Iframe not ready yet")
+        return
+      }
+
+      const iframe = iframeRef.current
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document
+
+      if (!iframeDoc) {
+        console.warn("Cannot access iframe document")
+        return
+      }
+
+      // Inject selection mode script
+      const script = iframeDoc.createElement("script")
+      script.id = "selection-mode-script"
+      script.innerHTML = `
+        (function() {
+          let hoveredElement = null;
+          let selectedElements = [];
+          
+          // Create overlay for hover effect
+          const hoverOverlay = document.createElement('div');
+          hoverOverlay.style.position = 'absolute';
+          hoverOverlay.style.pointerEvents = 'none';
+          hoverOverlay.style.backgroundColor = 'rgba(168, 85, 247, 0.2)';
+          hoverOverlay.style.border = '2px solid rgba(168, 85, 247, 0.8)';
+          hoverOverlay.style.zIndex = '9999';
+          hoverOverlay.style.display = 'none';
+          document.body.appendChild(hoverOverlay);
+          
+          // Function to update hover overlay position
+          function updateHoverOverlay(element) {
+            if (!element) {
+              hoverOverlay.style.display = 'none';
+              return;
+            }
+            
+            const rect = element.getBoundingClientRect();
+            hoverOverlay.style.display = 'block';
+            hoverOverlay.style.top = rect.top + 'px';
+            hoverOverlay.style.left = rect.left + 'px';
+            hoverOverlay.style.width = rect.width + 'px';
+            hoverOverlay.style.height = rect.height + 'px';
+          }
+          
+          // Function to generate a unique selector for an element
+          function generateSelector(element) {
+            if (element.id) {
+              return '#' + element.id;
+            }
+            
+            if (element.className && typeof element.className === 'string') {
+              const classes = element.className.split(' ').filter(c => c);
+              if (classes.length > 0) {
+                return element.tagName.toLowerCase() + '.' + classes.join('.');
+              }
+            }
+            
+            let selector = element.tagName.toLowerCase();
+            let parent = element.parentElement;
+            let siblings = parent ? Array.from(parent.children) : [];
+            
+            if (siblings.length > 1) {
+              const index = siblings.indexOf(element);
+              selector += ':nth-child(' + (index + 1) + ')';
+            }
+            
+            return selector;
+          }
+          
+          // Function to create a selection overlay for a selected element
+          function createSelectionOverlay(element) {
+            const rect = element.getBoundingClientRect();
+            const overlay = document.createElement('div');
+            overlay.className = 'selection-overlay';
+            overlay.style.position = 'absolute';
+            overlay.style.pointerEvents = 'none';
+            overlay.style.backgroundColor = 'rgba(168, 85, 247, 0.3)';
+            overlay.style.border = '2px solid rgba(168, 85, 247, 1)';
+            overlay.style.zIndex = '9998';
+            overlay.style.top = rect.top + 'px';
+            overlay.style.left = rect.left + 'px';
+            overlay.style.width = rect.width + 'px';
+            overlay.style.height = rect.height + 'px';
+            document.body.appendChild(overlay);
+            return overlay;
+          }
+          
+          // Mouse move handler
+          function handleMouseMove(e) {
+            // Ignore events on overlays
+            if (e.target.className === 'selection-overlay') return;
+            
+            hoveredElement = e.target;
+            updateHoverOverlay(hoveredElement);
+          }
+          
+          // Click handler
+          function handleClick(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Ignore clicks on overlays
+            if (e.target.className === 'selection-overlay') return;
+            
+            // Check if element is already selected
+            const selector = generateSelector(e.target);
+            const isAlreadySelected = selectedElements.some(el => el.selector === selector);
+            
+            if (!isAlreadySelected) {
+              const overlay = createSelectionOverlay(e.target);
+              selectedElements.push({
+                element: e.target,
+                selector: selector,
+                html: e.target.outerHTML,
+                overlay: overlay
+              });
+              
+              // Send message to parent window
+              window.parent.postMessage({
+                type: 'elementSelected',
+                elements: selectedElements.map(el => ({
+                  selector: el.selector,
+                  html: el.html
+                }))
+              }, '*');
+            }
+            
+            return false;
+          }
+          
+          // Add event listeners
+          document.addEventListener('mousemove', handleMouseMove);
+          document.addEventListener('click', handleClick, true);
+          
+          // Store references for cleanup
+          window.selectionModeCleanup = function() {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('click', handleClick, true);
+            hoverOverlay.remove();
+            
+            // Remove all selection overlays
+            document.querySelectorAll('.selection-overlay').forEach(el => el.remove());
+            
+            // Send final selection to parent
+            window.parent.postMessage({
+              type: 'selectionModeDisabled',
+              elements: selectedElements.map(el => ({
+                selector: el.selector,
+                html: el.html
+              }))
+            }, '*');
+          };
+        })();
+      `
+      iframeDoc.body.appendChild(script)
+    } catch (error) {
+      console.error("Error enabling selection mode:", error)
+    }
+  }
+
+  // Function to disable selection mode
+  const disableSelectionMode = () => {
+    try {
+      if (!iframeRef.current || !iframeRef.current.contentWindow) {
+        console.warn("Iframe not ready yet")
+        return
+      }
+
+      const iframe = iframeRef.current
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document
+
+      if (!iframeDoc) {
+        console.warn("Cannot access iframe document")
+        return
+      }
+
+      // Call cleanup function
+      if (iframe.contentWindow.selectionModeCleanup) {
+        iframe.contentWindow.selectionModeCleanup()
+      }
+
+      // Remove script
+      const script = iframeDoc.getElementById("selection-mode-script")
+      if (script) {
+        script.remove()
+      }
+    } catch (error) {
+      console.error("Error disabling selection mode:", error)
+    }
+  }
+
+  // Listen for messages from the iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === "elementSelected" || event.data.type === "selectionModeDisabled") {
+        setSelectedElements(event.data.elements)
+        if (onElementsSelected) {
+          onElementsSelected(event.data.elements)
+        }
+      }
+    }
+
+    window.addEventListener("message", handleMessage)
+    return () => {
+      window.removeEventListener("message", handleMessage)
+    }
+  }, [onElementsSelected])
+
+  // Clean up selection mode when component unmounts
+  useEffect(() => {
+    return () => {
+      if (isSelectionMode) {
+        try {
+          disableSelectionMode()
+        } catch (error) {
+          console.error("Error cleaning up selection mode:", error)
+        }
+      }
+    }
+  }, [isSelectionMode])
+
+  // Clear selected elements
+  const clearSelectedElements = () => {
+    setSelectedElements([])
+    if (onElementsSelected) {
+      onElementsSelected([])
+    }
+  }
+
+  // Handle iframe load event
+  const handleIframeLoad = () => {
+    setIframeLoaded(true)
+  }
+
   // Add a flex-grow and min-width to ensure the preview maintains its size
   return (
     <div className="flex-1 flex-grow bg-background flex flex-col h-full min-w-0">
       <div className="flex items-center p-2 border-b border-border bg-[#13111C]">
-        <div className="flex-1 mx-auto max-w-md">
-          <div className="bg-background border border-input rounded-md px-3 py-1 text-sm text-center truncate">
+        <div className="flex-1 mx-auto max-w-md flex items-center">
+          <div className="bg-background border border-input rounded-md px-3 py-1 text-sm text-center truncate flex-1">
             {isServerStarted ? `https://wegenweb.com/project/${directory}` : "preview.manufactura.ai"}
           </div>
+          <button
+            onClick={toggleSelectionMode}
+            className={`ml-2 p-1.5 rounded-md ${
+              isSelectionMode
+                ? "bg-purple-600 text-white"
+                : "bg-background border border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            }`}
+            title={isSelectionMode ? "Disable selection mode" : "Enable selection mode"}
+            disabled={!isServerStarted || isGenerating || !iframeLoaded}
+          >
+            <Pointer className="h-4 w-4" />
+          </button>
         </div>
       </div>
+
+      {selectedElements.length > 0 && (
+        <div className="bg-[#13111C] border-b border-border px-4 py-1.5 flex items-center">
+          <span className="text-sm text-purple-300 font-medium">
+            {selectedElements.length} element{selectedElements.length !== 1 ? "s" : ""} selected
+          </span>
+          <button
+            onClick={clearSelectedElements}
+            className="ml-2 text-xs text-purple-400 hover:text-purple-300 flex items-center"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Remove
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-hidden relative">
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#0A090F]/80 z-10">
@@ -283,10 +597,12 @@ export default function WebsitePreview({ content, directory, isGenerating, onTab
 
         {isServerStarted && serverPort ? (
           <iframe
+            ref={iframeRef}
             src={`https://wegenweb.com/project/${directory}`}
             title="Website Preview"
             className="w-full h-full border-none"
             sandbox="allow-same-origin allow-scripts"
+            onLoad={handleIframeLoad}
           />
         ) : (
           <iframe
@@ -294,6 +610,7 @@ export default function WebsitePreview({ content, directory, isGenerating, onTab
             title="Website Preview"
             className="w-full h-full border-none"
             sandbox="allow-same-origin allow-scripts"
+            onLoad={handleIframeLoad}
           />
         )}
       </div>

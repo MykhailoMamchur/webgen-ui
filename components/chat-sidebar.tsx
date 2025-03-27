@@ -2,10 +2,11 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { Send, Square, Plus } from "lucide-react"
+import { Send, Square, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
+// Update the ChatSidebarProps interface to include selected elements info
 interface ChatSidebarProps {
   messages: { role: "user" | "assistant"; content: string }[]
   onSendMessage: (message: string) => void
@@ -13,6 +14,8 @@ interface ChatSidebarProps {
   onAbortGeneration?: () => void
   noProjectSelected?: boolean
   onCreateProject?: () => void
+  selectedElementsCount?: number
+  onClearSelectedElements?: () => void
 }
 
 export default function ChatSidebar({
@@ -22,6 +25,8 @@ export default function ChatSidebar({
   onAbortGeneration,
   noProjectSelected = false,
   onCreateProject,
+  selectedElementsCount = 0,
+  onClearSelectedElements,
 }: ChatSidebarProps) {
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -86,6 +91,24 @@ export default function ChatSidebar({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Add selected elements indicator */}
+      {selectedElementsCount > 0 && (
+        <div className="px-4 py-2 border-t border-purple-900/20 bg-purple-500/10">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-purple-300 font-medium">
+              {selectedElementsCount} element{selectedElementsCount !== 1 ? "s" : ""} selected
+            </span>
+            <button
+              onClick={onClearSelectedElements}
+              className="text-xs text-purple-400 hover:text-purple-300 flex items-center"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Remove
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="p-4 border-t border-purple-900/20">
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <Textarea
@@ -96,7 +119,9 @@ export default function ChatSidebar({
                 ? "Create a project to start..."
                 : isGenerating
                   ? "Generation in progress..."
-                  : "Describe your website or request changes..."
+                  : selectedElementsCount > 0
+                    ? "Describe changes for selected elements..."
+                    : "Describe your website or request changes..."
             }
             className="min-h-[80px] resize-none bg-gray-200 dark:bg-gray-300 text-gray-900 border-0 rounded-xl placeholder:text-gray-600 focus-visible:ring-purple-500/30"
             onKeyDown={(e) => {
