@@ -8,7 +8,7 @@ import WelcomeScreen from "@/components/welcome-screen"
 import NewProjectModal from "@/components/new-project-modal"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Tabs } from "@/components/tabs"
-import CodeView from "@/components/code-view"
+import GenerationCodeView from "@/components/generation-code-view"
 import ProjectFilesTab from "@/components/project-files-tab"
 import DeploymentsTab from "@/components/deployments-tab"
 import type { Project, ProjectSummary } from "@/types/project"
@@ -579,6 +579,7 @@ export default function Home() {
       setActiveTab("generation")
 
       // Use the edit API for both initial generation and edits
+      // Pass the abort signal to ensure server-side processing stops when aborted
       const response = await fetch("/api/edit", {
         method: "POST",
         headers: {
@@ -633,6 +634,7 @@ export default function Home() {
       } catch (error) {
         if ((error as Error).name === "AbortError") {
           // Generation aborted
+          console.log("Generation aborted by user")
         } else {
           throw error
         }
@@ -649,7 +651,7 @@ export default function Home() {
     } catch (error) {
       // Check if this was an abort error
       if ((error as Error).name === "AbortError") {
-        // Generation aborted
+        console.log("Generation aborted by user")
       } else {
         const errorMessage = (error as Error).message || "Failed to generate content"
         setGenerationError(errorMessage)
@@ -868,7 +870,7 @@ export default function Home() {
               ) : activeTab === "deployments" ? (
                 <DeploymentsTab />
               ) : (
-                <CodeView code={codeContent} isGenerating={isGenerating} />
+                <GenerationCodeView code={codeContent} isGenerating={isGenerating} />
               )}
             </div>
           </div>

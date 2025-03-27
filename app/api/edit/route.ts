@@ -19,6 +19,16 @@ export async function POST(request: NextRequest) {
       delete requestBody.directory
     }
 
+    // Create an AbortController to handle client disconnections
+    const controller = new AbortController()
+    const { signal } = controller
+
+    // Set up a handler for request cancellation
+    request.signal.addEventListener("abort", () => {
+      // Abort the fetch to the backend when the client aborts
+      controller.abort()
+    })
+
     // Update the API endpoint to use wegenweb.com/api
     const response = await fetch("https://wegenweb.com/api/edit", {
       method: "POST",
@@ -26,6 +36,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(requestBody),
+      signal, // Pass the abort signal to the fetch request
     })
 
     // If the response is not ok, throw an error
@@ -53,6 +64,11 @@ export async function POST(request: NextRequest) {
             clearInterval(interval)
           }
         }, 15000)
+
+        // Clean up the interval when the request is aborted
+        request.signal.addEventListener("abort", () => {
+          clearInterval(interval)
+        })
       },
       transform(chunk, controller) {
         controller.enqueue(chunk)
