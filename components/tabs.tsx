@@ -18,7 +18,7 @@ export function Tabs({
 }: TabsProps & { isGenerating?: boolean }) {
   return (
     <div className={cn("flex border-b border-purple-900/20 w-full", className)}>
-      {tabs.map((tab) => (
+      {tabs.map((tab, index) => (
         <button
           key={tab.id}
           onClick={() => (!isGenerating || tab.id !== "preview" ? onChange(tab.id) : null)}
@@ -26,6 +26,8 @@ export function Tabs({
             "px-4 py-2 text-sm font-medium transition-colors relative",
             activeTab === tab.id ? "text-purple-400" : "text-muted-foreground hover:text-purple-300",
             isGenerating && tab.id === "preview" ? "opacity-50 cursor-not-allowed" : "",
+            // Add a subtle divider before deployments tab
+            tab.id === "deployments" ? "ml-2 border-l border-purple-900/20" : "",
           )}
           disabled={isGenerating && tab.id === "preview"}
         >

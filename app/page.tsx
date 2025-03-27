@@ -9,6 +9,7 @@ import NewProjectModal from "@/components/new-project-modal"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Tabs } from "@/components/tabs"
 import CodeView from "@/components/code-view"
+import ProjectFilesTab from "@/components/project-files-tab"
 import DeploymentsTab from "@/components/deployments-tab"
 import type { Project, ProjectSummary } from "@/types/project"
 import { v4 as uuidv4 } from "uuid"
@@ -718,6 +719,7 @@ export default function Home() {
   const tabs = [
     { id: "preview", label: "Preview" },
     { id: "generation", label: "Generation" },
+    { id: "project-files", label: "Project Files" },
     { id: "deployments", label: "Deployments" },
   ]
 
@@ -861,6 +863,8 @@ export default function Home() {
                     }
                   }}
                 />
+              ) : activeTab === "project-files" ? (
+                <ProjectFilesTab projectName={currentProject?.directory || ""} />
               ) : activeTab === "deployments" ? (
                 <DeploymentsTab />
               ) : (
