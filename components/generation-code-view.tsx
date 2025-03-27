@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useEffect, useRef, useState } from "react"
-import { Clipboard, Check, Loader2, FileCode, Edit, Replace, AlertTriangle } from "lucide-react"
+import { Clipboard, Check, Loader2, FileCode, Edit, Replace, AlertTriangle, Trash2 } from "lucide-react"
 
 interface CodeViewProps {
   code: string
@@ -54,7 +54,7 @@ const convertAnsiToHtml = (text: string) => {
 
 // Component to display a file action
 interface FileActionProps {
-  type: "create_file" | "edit_file" | "content_replace" | "report_issue"
+  type: "create_file" | "edit_file" | "content_replace" | "report_issue" | "delete_file"
   fileName?: string
   content?: string
   findContent?: string
@@ -103,11 +103,18 @@ const FileAction = ({
       {type === "create_file" && <FileCode className="h-4 w-4 text-green-400" />}
       {type === "edit_file" && <Edit className="h-4 w-4 text-blue-400" />}
       {type === "content_replace" && <Replace className="h-4 w-4 text-yellow-400" />}
+      {type === "delete_file" && <Trash2 className="h-4 w-4 text-red-400" />}
 
       <span className="font-mono text-sm text-gray-200 px-1">{fileName}</span>
 
       <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-purple-900/30 text-purple-300">
-        {type === "create_file" ? "Created" : type === "edit_file" ? "Edited" : "Modified"}
+        {type === "create_file"
+          ? "Created"
+          : type === "edit_file"
+            ? "Edited"
+            : type === "delete_file"
+              ? "Deleted"
+              : "Modified"}
       </span>
     </div>
   )
@@ -126,6 +133,19 @@ const FileAction = ({
             ))}
           </code>
         </pre>
+      </div>
+    )
+  }
+
+  // For delete_file, we want to show a special UI that indicates the file is being deleted
+  if (type === "delete_file") {
+    return (
+      <div className="my-2 bg-[#13111C] rounded-lg border border-red-500/30 overflow-hidden shadow-sm">
+        {renderHeader()}
+        <div className="p-3 text-sm font-mono bg-[#1E1A29] text-gray-300 flex items-center justify-center">
+          <Trash2 className="h-5 w-5 text-red-400 mr-2" />
+          <span>This file has been deleted</span>
+        </div>
       </div>
     )
   }
@@ -230,6 +250,8 @@ const extractFileActionsFromLogs = (logs: string, isGenerating: boolean): React.
           content={actionContent}
         />,
       )
+    } else if (actionType === "delete_file") {
+      result.push(<FileAction key={`action-${result.length}`} type="delete_file" fileName={fileName} />)
     } else if (actionType === "content_replace") {
       result.push(
         <FileAction
@@ -293,6 +315,15 @@ const extractFileActionsFromLogs = (logs: string, isGenerating: boolean): React.
             type={actionType}
             fileName={fileName}
             content={partialContent}
+            isPartial={true}
+          />,
+        )
+      } else if (actionType === "delete_file") {
+        result.push(
+          <FileAction
+            key={`partial-action-${result.length}`}
+            type="delete_file"
+            fileName={fileName}
             isPartial={true}
           />,
         )

@@ -5,13 +5,6 @@ import { Loader2 } from "lucide-react"
 // Add imports for the selection mode button
 import { Pointer, X } from "lucide-react"
 
-// Add type definition for the extended Window interface
-declare global {
-  interface Window {
-    selectionModeCleanup?: () => void
-  }
-}
-
 // Update the WebsitePreviewProps interface to include selected elements
 interface WebsitePreviewProps {
   content: string
@@ -274,52 +267,40 @@ export default function WebsitePreview({
     }
   }, [isServerStarted, hasGeneratedContent])
 
+  // Add this useEffect to inject the selection script when the server starts
+
   // Add a function to toggle selection mode
   const toggleSelectionMode = () => {
-    try {
-      if (!iframeRef.current || !iframeLoaded) {
-        console.warn("Iframe not ready yet")
-        return
-      }
-
-      if (isSelectionMode) {
-        disableSelectionMode()
-      } else {
-        enableSelectionMode()
-      }
-      setIsSelectionMode(!isSelectionMode)
-    } catch (error) {
-      console.error("Error toggling selection mode:", error)
+    if (!iframeRef.current || !iframeLoaded) {
+      console.warn("Iframe not ready yet")
+      return
     }
-  }
 
-  // Function to enable selection mode
-  const enableSelectionMode = () => {
-    try {
-      if (!iframeRef.current || !iframeRef.current.contentWindow) {
-        console.warn("Iframe not ready yet")
-        return
-      }
+    const newMode = !isSelectionMode
+    setIsSelectionMode(newMode)
 
-      const iframe = iframeRef.current
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document
-
-      if (!iframeDoc) {
-        console.warn("Cannot access iframe document")
-        return
-      }
-
-      // Inject selection mode script
-      const script = iframeDoc.createElement("script")
-      script.id = "selection-mode-script"
-      script.innerHTML = `
+    // Instead of trying to inject a script, we'll use a bookmarklet-style approach
+    // This injects the selection code directly via the iframe's URL
+    if (newMode) {
+      try {
+        // Create the selection mode script as a bookmarklet-style code
+        const selectionScript = `
         (function() {
+          // Only initialize once
+          if (window.selectionModeInitialized) {
+            window.selectionModeActive = true;
+            return;
+          }
+          
+          window.selectionModeInitialized = true;
+          window.selectionModeActive = true;
+          
           let hoveredElement = null;
           let selectedElements = [];
           
           // Create overlay for hover effect
           const hoverOverlay = document.createElement('div');
-          hoverOverlay.style.position = 'absolute';
+          hoverOverlay.style.position = 'fixed';
           hoverOverlay.style.pointerEvents = 'none';
           hoverOverlay.style.backgroundColor = 'rgba(168, 85, 247, 0.2)';
           hoverOverlay.style.border = '2px solid rgba(168, 85, 247, 0.8)';
@@ -329,7 +310,7 @@ export default function WebsitePreview({
           
           // Function to update hover overlay position
           function updateHoverOverlay(element) {
-            if (!element) {
+            if (!element || !window.selectionModeActive) {
               hoverOverlay.style.display = 'none';
               return;
             }
@@ -372,7 +353,7 @@ export default function WebsitePreview({
             const rect = element.getBoundingClientRect();
             const overlay = document.createElement('div');
             overlay.className = 'selection-overlay';
-            overlay.style.position = 'absolute';
+            overlay.style.position = 'fixed';
             overlay.style.pointerEvents = 'none';
             overlay.style.backgroundColor = 'rgba(168, 85, 247, 0.3)';
             overlay.style.border = '2px solid rgba(168, 85, 247, 1)';
@@ -387,6 +368,8 @@ export default function WebsitePreview({
           
           // Mouse move handler
           function handleMouseMove(e) {
+            if (!window.selectionModeActive) return;
+            
             // Ignore events on overlays
             if (e.target.className === 'selection-overlay') return;
             
@@ -396,6 +379,8 @@ export default function WebsitePreview({
           
           // Click handler
           function handleClick(e) {
+            if (!window.selectionModeActive) return;
+            
             e.preventDefault();
             e.stopPropagation();
             
@@ -432,14 +417,10 @@ export default function WebsitePreview({
           document.addEventListener('mousemove', handleMouseMove);
           document.addEventListener('click', handleClick, true);
           
-          // Store references for cleanup
-          window.selectionModeCleanup = function() {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('click', handleClick, true);
-            hoverOverlay.remove();
-            
-            // Remove all selection overlays
-            document.querySelectorAll('.selection-overlay').forEach(el => el.remove());
+          // Function to disable selection mode
+          window.disableSelectionMode = function() {
+            window.selectionModeActive = false;
+            hoverOverlay.style.display = 'none';
             
             // Send final selection to parent
             window.parent.postMessage({
@@ -450,52 +431,112 @@ export default function WebsitePreview({
               }))
             }, '*');
           };
+          
+          // Function to clear selections
+          window.clearSelections = function() {
+            document.querySelectorAll('.selection-overlay').forEach(el => el.remove());
+            selectedElements = [];
+            
+            window.parent.postMessage({
+              type: 'selectionModeDisabled',
+              elements: []
+            }, '*');
+          };
+          
+          // Listen for messages from parent
+          window.addEventListener('message', function(event) {
+            if (event.source === window.parent) {
+              if (event.data.action === 'disableSelectionMode') {
+                window.disableSelectionMode();
+              } else if (event.data.action === 'clearSelections') {
+                window.clearSelections();
+              }
+            }
+          });
+          
+          console.log('Selection mode enabled');
         })();
       `
-      iframeDoc.body.appendChild(script)
-    } catch (error) {
-      console.error("Error enabling selection mode:", error)
+
+        // Create a JavaScript URL
+        const jsUrl = `javascript:(${encodeURIComponent(selectionScript)})()`
+
+        // Store the current URL to restore it later
+        const currentUrl = iframeRef.current.src
+
+        // Navigate the iframe to the JavaScript URL
+        iframeRef.current.src = jsUrl
+
+        // Restore the original URL after a short delay
+        setTimeout(() => {
+          if (iframeRef.current) {
+            iframeRef.current.src = currentUrl
+
+            // After the iframe reloads, we need to wait for it to load
+            const handleReload = () => {
+              // Send a message to enable selection mode
+              setTimeout(() => {
+                iframeRef.current?.contentWindow?.postMessage(
+                  {
+                    action: "enableSelectionMode",
+                  },
+                  "*",
+                )
+              }, 500)
+
+              // Remove the event listener
+              iframeRef.current?.removeEventListener("load", handleReload)
+            }
+
+            // Add event listener for iframe load
+            iframeRef.current.addEventListener("load", handleReload)
+          }
+        }, 100)
+      } catch (error) {
+        console.error("Error enabling selection mode:", error)
+        setIsSelectionMode(false)
+      }
+    } else {
+      // Disable selection mode
+      try {
+        iframeRef.current.contentWindow?.postMessage(
+          {
+            action: "disableSelectionMode",
+          },
+          "*",
+        )
+      } catch (error) {
+        console.error("Error disabling selection mode:", error)
+      }
     }
   }
 
-  // Function to disable selection mode
-  const disableSelectionMode = () => {
-    try {
-      if (!iframeRef.current || !iframeRef.current.contentWindow) {
-        console.warn("Iframe not ready yet")
-        return
+  // Clear selected elements
+  const clearSelectedElements = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage({ action: "clearSelections" }, "*")
+      } catch (error) {
+        console.error("Error sending message to iframe:", error)
       }
+    }
 
-      const iframe = iframeRef.current
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document
-
-      if (!iframeDoc) {
-        console.warn("Cannot access iframe document")
-        return
-      }
-
-      // Call cleanup function
-      if (iframe.contentWindow.selectionModeCleanup) {
-        iframe.contentWindow.selectionModeCleanup()
-      }
-
-      // Remove script
-      const script = iframeDoc.getElementById("selection-mode-script")
-      if (script) {
-        script.remove()
-      }
-    } catch (error) {
-      console.error("Error disabling selection mode:", error)
+    setSelectedElements([])
+    if (onElementsSelected) {
+      onElementsSelected([])
     }
   }
 
   // Listen for messages from the iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === "elementSelected" || event.data.type === "selectionModeDisabled") {
-        setSelectedElements(event.data.elements)
-        if (onElementsSelected) {
-          onElementsSelected(event.data.elements)
+      // Only accept messages from our iframe
+      if (iframeRef.current && event.source === iframeRef.current.contentWindow) {
+        if (event.data.type === "elementSelected" || event.data.type === "selectionModeDisabled") {
+          setSelectedElements(event.data.elements || [])
+          if (onElementsSelected) {
+            onElementsSelected(event.data.elements || [])
+          }
         }
       }
     }
@@ -506,30 +547,17 @@ export default function WebsitePreview({
     }
   }, [onElementsSelected])
 
-  // Clean up selection mode when component unmounts
-  useEffect(() => {
-    return () => {
-      if (isSelectionMode) {
-        try {
-          disableSelectionMode()
-        } catch (error) {
-          console.error("Error cleaning up selection mode:", error)
-        }
-      }
-    }
-  }, [isSelectionMode])
-
-  // Clear selected elements
-  const clearSelectedElements = () => {
-    setSelectedElements([])
-    if (onElementsSelected) {
-      onElementsSelected([])
-    }
-  }
-
   // Handle iframe load event
   const handleIframeLoad = () => {
     setIframeLoaded(true)
+
+    // We'll use a simpler approach - just notify that we're ready to receive messages
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      // Let the iframe know we're ready to communicate
+      setTimeout(() => {
+        iframeRef.current?.contentWindow?.postMessage({ action: "parentReady" }, "*")
+      }, 500)
+    }
   }
 
   // Add a flex-grow and min-width to ensure the preview maintains its size
