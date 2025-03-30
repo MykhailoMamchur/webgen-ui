@@ -178,13 +178,40 @@ export default function WebsitePreview({
 
   // Reset state when directory changes, but don't check status during generation
   useEffect(() => {
+    // Reset state when directory changes
     setIsServerStarted(false)
     setServerPort(null)
     setError(null)
+    setIframeLoaded(false)
+    setSelectedElements([])
+
+    // Clear any selection overlays in the current iframe before changing
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage({ action: "clearSelections" }, "*")
+        // If selection mode was active, disable it
+        if (isSelectionMode) {
+          iframeRef.current.contentWindow.postMessage({ action: "disableSelectionMode" }, "*")
+          setIsSelectionMode(false)
+        }
+      } catch (error) {
+        // Ignore errors during cleanup
+        console.log("Cleanup error (safe to ignore):", error)
+      }
+    }
 
     // Check if the server for this directory is already running, but ONLY if not generating
     if (directory && !isGenerating) {
       checkProjectStatus()
+    }
+
+    // Cleanup function
+    return () => {
+      // Clean up any iframe-related resources when unmounting or changing directory
+      if (iframeRef.current) {
+        // Remove src to stop any ongoing requests
+        iframeRef.current.src = "about:blank"
+      }
     }
   }, [directory, isGenerating])
 
@@ -549,15 +576,28 @@ export default function WebsitePreview({
 
   // Handle iframe load event
   const handleIframeLoad = () => {
-    setIframeLoaded(true)
-
-    // We'll use a simpler approach - just notify that we're ready to receive messages
+    // Only set as loaded if the iframe still exists and has a valid contentWindow
     if (iframeRef.current && iframeRef.current.contentWindow) {
-      // Let the iframe know we're ready to communicate
-      setTimeout(() => {
-        iframeRef.current?.contentWindow?.postMessage({ action: "parentReady" }, "*")
-      }, 500)
+      setIframeLoaded(true)
+
+      // We'll use a simpler approach - just notify that we're ready to receive messages
+      try {
+        // Let the iframe know we're ready to communicate
+        setTimeout(() => {
+          if (iframeRef.current?.contentWindow) {
+            iframeRef.current.contentWindow.postMessage({ action: "parentReady" }, "*")
+          }
+        }, 500)
+      } catch (error) {
+        console.error("Error communicating with iframe:", error)
+      }
     }
+  }
+
+  // Add error handling for iframe navigation
+  const handleIframeError = () => {
+    setIframeLoaded(false)
+    setError("Failed to load preview. Please try refreshing.")
   }
 
   // Add a flex-grow and min-width to ensure the preview maintains its size
@@ -625,20 +665,24 @@ export default function WebsitePreview({
 
         {isServerStarted && serverPort ? (
           <iframe
+            key={`preview-${directory}`}
             ref={iframeRef}
             src={`https://wegenweb.com/project/${directory}`}
             title="Website Preview"
             className="w-full h-full border-none"
             sandbox="allow-same-origin allow-scripts"
             onLoad={handleIframeLoad}
+            onError={handleIframeError}
           />
         ) : (
           <iframe
+            key={`placeholder-${directory}`}
             ref={iframeRef}
             title="Website Preview"
             className="w-full h-full border-none"
             sandbox="allow-same-origin allow-scripts"
             onLoad={handleIframeLoad}
+            onError={handleIframeError}
           />
         )}
       </div>

@@ -827,6 +827,11 @@ export default function Home() {
       setAbortController(null)
     }
 
+    // If we're in preview tab, switch to generation tab first to avoid iframe issues
+    if (activeTab === "preview") {
+      setActiveTab("generation")
+    }
+
     const selectedProject = projects.find((p) => p.id === projectId)
     if (!selectedProject) return
 
