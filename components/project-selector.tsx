@@ -1,9 +1,12 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useRef, useEffect } from "react"
-import { ChevronDown, Plus, FolderOpen, Trash2 } from "lucide-react"
+import { ChevronDown, Plus, FolderOpen, Trash2, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { ProjectSummary } from "@/types/project"
+import RenameProjectModal from "@/components/rename-project-modal"
 
 interface ProjectSelectorProps {
   currentProject: ProjectSummary | null
@@ -11,6 +14,7 @@ interface ProjectSelectorProps {
   onSelectProject: (projectId: string) => void
   onNewProject: () => void
   onDeleteProject?: (projectId: string) => void
+  onRenameProject?: (projectId: string, newName: string) => void
   isGenerating?: boolean
 }
 
@@ -20,12 +24,16 @@ export default function ProjectSelector({
   onSelectProject,
   onNewProject,
   onDeleteProject,
+  onRenameProject,
   isGenerating = false,
 }: ProjectSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   // Add a new state for tracking which project is being deleted
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
+  // Add state for the rename modal
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false)
+  const [projectToRename, setProjectToRename] = useState<ProjectSummary | null>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -40,6 +48,24 @@ export default function ProjectSelector({
       document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [])
+
+  // Handle opening the rename modal
+  const handleOpenRenameModal = (project: ProjectSummary, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!isGenerating) {
+      setProjectToRename(project)
+      setIsRenameModalOpen(true)
+      setIsOpen(false) // Close the dropdown
+    }
+  }
+
+  // Handle the rename operation
+  const handleRenameProject = async (newName: string) => {
+    if (!projectToRename || !onRenameProject) return
+
+    await onRenameProject(projectToRename.id, newName)
+    setProjectToRename(null)
+  }
 
   return (
     <div className="relative z-[9999]" ref={dropdownRef}>
@@ -81,21 +107,32 @@ export default function ProjectSelector({
                       </div>
                     </div>
                     <div className="flex items-center">
+                      {onRenameProject && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-6 w-6 ml-1 text-gray-400 hover:text-blue-400 ${isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
+                          onClick={(e) => handleOpenRenameModal(project, e)}
+                          disabled={isGenerating}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                      )}
                       {onDeleteProject && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={`h-6 w-6 ml-1 text-gray-400 hover:text-red-400 ${deletingProjectId === project.id ? "opacity-50" : ""}`}
+                          className={`h-6 w-6 ml-1 text-gray-400 hover:text-red-400 ${deletingProjectId === project.id ? "opacity-50" : ""} ${isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
                           onClick={(e) => {
                             e.stopPropagation()
-                            if (confirm("Are you sure you want to delete this project?")) {
+                            if (!isGenerating && confirm("Are you sure you want to delete this project?")) {
                               setDeletingProjectId(project.id)
                               onDeleteProject(project.id).finally(() => {
                                 setDeletingProjectId(null)
                               })
                             }
                           }}
-                          disabled={deletingProjectId === project.id}
+                          disabled={deletingProjectId === project.id || isGenerating}
                         >
                           {deletingProjectId === project.id ? (
                             <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />
@@ -129,6 +166,19 @@ export default function ProjectSelector({
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Rename Project Modal */}
+      {projectToRename && (
+        <RenameProjectModal
+          isOpen={isRenameModalOpen}
+          onClose={() => {
+            setIsRenameModalOpen(false)
+            setProjectToRename(null)
+          }}
+          onRenameProject={handleRenameProject}
+          currentName={projectToRename.name}
+        />
       )}
     </div>
   )

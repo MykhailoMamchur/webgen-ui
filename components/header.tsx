@@ -13,6 +13,7 @@ interface HeaderProps {
   onSelectProject: (projectId: string) => void
   onNewProject: () => void
   onDeleteProject: (projectId: string) => Promise<void>
+  onRenameProject?: (projectId: string, newName: string) => void
   isGenerating?: boolean
 }
 
@@ -31,6 +32,7 @@ export default function Header({
   onSelectProject,
   onNewProject,
   onDeleteProject,
+  onRenameProject,
   isGenerating = false,
 }: HeaderProps) {
   const { theme, setTheme } = useTheme()
@@ -140,6 +142,8 @@ export default function Header({
           onSelectProject={onSelectProject}
           onNewProject={onNewProject}
           onDeleteProject={onDeleteProject}
+          onRenameProject={onRenameProject}
+          isGenerating={isGenerating}
         />
       </div>
 

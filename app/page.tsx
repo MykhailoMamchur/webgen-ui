@@ -501,6 +501,36 @@ export default function Home() {
     )
   }
 
+  // Add a function to handle project renaming
+  const handleRenameProject = async (projectId: string, newName: string) => {
+    const projectToRename = projects.find((p) => p.id === projectId)
+    if (!projectToRename) return
+
+    // Format the new name (replace spaces with hyphens)
+    const formattedNewName = newName.trim().replace(/\s+/g, "-")
+
+    // Update the project in the local state
+    setProjects((prev) =>
+      prev.map((project) => {
+        if (project.id === projectId) {
+          return {
+            ...project,
+            name: formattedNewName,
+            directory: formattedNewName,
+            updatedAt: new Date(),
+          }
+        }
+        return project
+      }),
+    )
+
+    // If the renamed project is the current one, update the current project ID
+    if (currentProjectId === projectId) {
+      // No need to change the ID, just update the project properties
+      // The reference to the current project will be updated automatically
+    }
+  }
+
   const handleStart = async (prompt: string) => {
     setIsExiting(true)
 
@@ -859,6 +889,7 @@ export default function Home() {
           onSelectProject={handleSelectProject}
           onNewProject={() => setIsNewProjectModalOpen(true)}
           onDeleteProject={deleteProject}
+          onRenameProject={handleRenameProject}
           isGenerating={isGenerating}
         />
         <div className="flex flex-1 overflow-hidden">
