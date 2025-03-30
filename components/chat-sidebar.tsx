@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { Send, Square, Plus, X, Clock, RotateCcw, ChevronDown, ChevronRight } from "lucide-react"
+import { Send, Square, Plus, X, Clock, RotateCcw, ChevronDown, ChevronRight, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -35,6 +35,25 @@ export default function ChatSidebar({
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [expandedCheckpoints, setExpandedCheckpoints] = useState<Record<number, boolean>>({})
+  // Add state for expanded messages
+  const [expandedMessages, setExpandedMessages] = useState<Record<number, boolean>>({})
+  // Add state to track checkpoint counts
+  const [checkpointCounts, setCheckpointCounts] = useState<Record<string, number>>({})
+
+  // Calculate checkpoint numbers when messages change
+  useEffect(() => {
+    const counts: Record<string, number> = {}
+    let commitCount = 0
+
+    messages.forEach((message) => {
+      if (message.role === "git" && message.action === "commit" && message.hash) {
+        commitCount++
+        counts[message.hash] = commitCount
+      }
+    })
+
+    setCheckpointCounts(counts)
+  }, [messages])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,6 +84,20 @@ export default function ChatSidebar({
       ...prev,
       [index]: !prev[index],
     }))
+  }
+
+  // Add function to toggle message expansion
+  const toggleMessageExpansion = (index: number) => {
+    setExpandedMessages((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }))
+  }
+
+  // Check if a message is long and should be collapsible
+  const isLongMessage = (content: string): boolean => {
+    const lines = content.split("\n")
+    return lines.length > 10 || content.length > 600
   }
 
   // Format timestamp from content if available
@@ -105,7 +138,9 @@ export default function ChatSidebar({
                       <Clock className="h-3.5 w-3.5 text-indigo-400" />
                       <div className="flex items-center">
                         <span className="text-indigo-300 font-medium">
-                          {message.action === "commit" ? "Checkpoint" : "Restored"}
+                          {message.action === "commit"
+                            ? `Checkpoint #${(message.hash && checkpointCounts[message.hash]) || "?"}`
+                            : "Restored"}
                         </span>
                         {message.action === "commit" && message.content && (
                           <button
@@ -151,9 +186,36 @@ export default function ChatSidebar({
                     message.role === "user"
                       ? "bg-purple-600 text-white shadow-lg shadow-purple-500/10"
                       : "bg-purple-500/10 text-purple-50"
-                  } whitespace-pre-line`}
+                  }`}
                 >
-                  {message.content}
+                  {isLongMessage(message.content) ? (
+                    <div>
+                      {/* Show preview or full content based on expanded state */}
+                      <div className={expandedMessages[index] ? "" : "line-clamp-3 whitespace-pre-line"}>
+                        {message.content}
+                      </div>
+
+                      {/* Show/hide toggle button */}
+                      <button
+                        onClick={() => toggleMessageExpansion(index)}
+                        className="mt-2 text-xs opacity-80 hover:opacity-100 flex items-center"
+                      >
+                        {expandedMessages[index] ? (
+                          <>
+                            <ChevronUp className="h-3 w-3 mr-1" />
+                            Show less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-3 w-3 mr-1" />
+                            Show more
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-line">{message.content}</div>
+                  )}
                 </div>
               )}
             </div>
