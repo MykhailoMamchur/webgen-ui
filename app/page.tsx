@@ -506,28 +506,48 @@ export default function Home() {
     const projectToRename = projects.find((p) => p.id === projectId)
     if (!projectToRename) return
 
-    // Format the new name (replace spaces with hyphens)
-    const formattedNewName = newName.trim().replace(/\s+/g, "-")
+    try {
+      // Format the new name (replace spaces with hyphens)
+      const formattedNewName = newName.trim().replace(/\s+/g, "-")
 
-    // Update the project in the local state
-    setProjects((prev) =>
-      prev.map((project) => {
-        if (project.id === projectId) {
-          return {
-            ...project,
-            name: formattedNewName,
-            directory: formattedNewName,
-            updatedAt: new Date(),
+      // Call the API to rename the project on the server
+      const response = await fetch("/api/project/rename", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          project_name: projectToRename.directory,
+          new_project_name: formattedNewName,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to rename project: ${response.status}`)
+      }
+
+      // Only update the local state after the server-side rename is successful
+      setProjects((prev) =>
+        prev.map((project) => {
+          if (project.id === projectId) {
+            return {
+              ...project,
+              name: formattedNewName,
+              directory: formattedNewName,
+              updatedAt: new Date(),
+            }
           }
-        }
-        return project
-      }),
-    )
+          return project
+        }),
+      )
 
-    // If the renamed project is the current one, update the current project ID
-    if (currentProjectId === projectId) {
-      // No need to change the ID, just update the project properties
-      // The reference to the current project will be updated automatically
+      // If the renamed project is the current one, we don't need to change the ID
+      // Just let the UI update with the new name
+    } catch (error) {
+      console.error("Error renaming project:", error)
+      alert(`Failed to rename project: ${(error as Error).message}`)
+      throw error // Re-throw to propagate to the UI
     }
   }
 
