@@ -19,7 +19,7 @@ const DEFAULT_HTML = ``
 
 // Initial welcome message for new projects - shorter and simpler
 const WELCOME_MESSAGE =
-  "Describe a desired website (purpose, style, content) and I'll create it for you. Use commands like /strictlayout, /noimprove, or /norefine if needed. What would you like to build today?"
+  "Describe a desired website (purpose, style, content) and I'll create it for you. What would you like to build today?"
 
 // Random project name generator
 const generateProjectName = (existingNames: string[] = []) => {
@@ -569,6 +569,16 @@ export default function Home() {
 
       if (!currentProject) return
 
+      // Fetch the latest messages before adding the user message
+      try {
+        const serverMessages = await loadMessagesFromServer(currentProject.directory)
+        if (serverMessages && serverMessages.length > 0) {
+          updateCurrentProject({ messages: serverMessages })
+        }
+      } catch (error) {
+        console.error("Error fetching messages before starting:", error)
+      }
+
       // Create user message
       const userMessage = {
         role: "user" as const,
@@ -595,7 +605,18 @@ export default function Home() {
       // Start generating content
       await generateContent(prompt)
 
-      // Add assistant response after generation is complete if no error occurred
+      // Fetch the latest messages after generation
+      try {
+        const serverMessages = await loadMessagesFromServer(currentProject.directory)
+        if (serverMessages && serverMessages.length > 0) {
+          updateCurrentProject({ messages: serverMessages })
+          return // Skip adding the default assistant response if we got messages from server
+        }
+      } catch (error) {
+        console.error("Error fetching messages after generation:", error)
+      }
+
+      // Add assistant response after generation is complete if no error occurred and we didn't get messages from server
       if (!generationError && currentProject) {
         const assistantResponse = {
           role: "assistant" as const,
@@ -609,6 +630,16 @@ export default function Home() {
 
         // Save the assistant response to the server
         await saveMessageToServer(currentProject.directory, assistantResponse)
+
+        // Fetch messages one more time after saving the assistant response
+        try {
+          const serverMessages = await loadMessagesFromServer(currentProject.directory)
+          if (serverMessages && serverMessages.length > 0) {
+            updateCurrentProject({ messages: serverMessages })
+          }
+        } catch (error) {
+          console.error("Error fetching messages after assistant response:", error)
+        }
       }
 
       // Don't switch to preview tab automatically
@@ -756,6 +787,18 @@ export default function Home() {
 
           // Save the error message to the server
           await saveMessageToServer(currentProject.directory, errorResponse)
+
+          // Fetch messages after saving the error response
+          try {
+            const serverMessages = await loadMessagesFromServer(currentProject.directory)
+            if (serverMessages && serverMessages.length > 0) {
+              updateCurrentProject({
+                messages: serverMessages,
+              })
+            }
+          } catch (error) {
+            console.error("Error fetching messages after error response:", error)
+          }
         }
       }
       setIsGenerating(false)
@@ -771,6 +814,16 @@ export default function Home() {
   // Remove the editContent function and update handleSendMessage to use generateContent
   const handleSendMessage = async (message: string) => {
     if (!currentProjectId || !currentProject) return
+
+    // Fetch the latest messages before sending a new message
+    try {
+      const serverMessages = await loadMessagesFromServer(currentProject.directory)
+      if (serverMessages && serverMessages.length > 0) {
+        updateCurrentProject({ messages: serverMessages })
+      }
+    } catch (error) {
+      console.error("Error fetching messages before sending:", error)
+    }
 
     // Create user message
     const userMessage = {
@@ -791,7 +844,18 @@ export default function Home() {
     // Clear selected elements after sending
     setSelectedElements([])
 
-    // Add assistant response if no error occurred
+    // Fetch the latest messages after sending and generation
+    try {
+      const serverMessages = await loadMessagesFromServer(currentProject.directory)
+      if (serverMessages && serverMessages.length > 0) {
+        updateCurrentProject({ messages: serverMessages })
+        return // Skip adding the default assistant response if we got messages from server
+      }
+    } catch (error) {
+      console.error("Error fetching messages after sending:", error)
+    }
+
+    // Add assistant response if no error occurred and we didn't get messages from server
     if (!generationError && currentProject) {
       const assistantResponse = {
         role: "assistant" as const,
@@ -805,6 +869,16 @@ export default function Home() {
 
       // Save the assistant response to the server
       await saveMessageToServer(currentProject.directory, assistantResponse)
+
+      // Fetch messages one more time after saving the assistant response
+      try {
+        const serverMessages = await loadMessagesFromServer(currentProject.directory)
+        if (serverMessages && serverMessages.length > 0) {
+          updateCurrentProject({ messages: serverMessages })
+        }
+      } catch (error) {
+        console.error("Error fetching messages after assistant response:", error)
+      }
     }
   }
 
