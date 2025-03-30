@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
       !body.message ||
       !body.message.role ||
       !body.message.content ||
-      (body.message.role !== "user" && body.message.role !== "assistant")
+      (body.message.role !== "user" && body.message.role !== "assistant" && body.message.role !== "git")
     ) {
       return NextResponse.json(
         {
-          error: "Valid message object is required with role (user or assistant) and content",
+          error: "Valid message object is required with role (user, assistant, or git) and content",
         },
         { status: 400 },
       )
@@ -31,12 +31,14 @@ export async function POST(request: NextRequest) {
       headers: {
         "Content-Type": "application/json",
       },
-      // Make sure we're explicitly passing the role in the request body
+      // Make sure we're explicitly passing all properties in the request body
       body: JSON.stringify({
         project_name: body.project_name,
         message: {
           role: body.message.role,
           content: body.message.content,
+          ...(body.message.action && { action: body.message.action }),
+          ...(body.message.hash && { hash: body.message.hash }),
         },
       }),
     })

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { Send, Square, Plus, X } from "lucide-react"
+import { Send, Square, Plus, X, Clock, RotateCcw, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -17,6 +17,7 @@ interface ChatSidebarProps {
   selectedElementsCount?: number
   onClearSelectedElements?: () => void
   onRestoreCheckpoint?: (hash: string) => void
+  restoringCheckpoint?: string | null
 }
 
 export default function ChatSidebar({
@@ -29,9 +30,11 @@ export default function ChatSidebar({
   selectedElementsCount = 0,
   onClearSelectedElements,
   onRestoreCheckpoint,
+  restoringCheckpoint = null,
 }: ChatSidebarProps) {
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [expandedCheckpoints, setExpandedCheckpoints] = useState<Record<number, boolean>>({})
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,6 +60,23 @@ export default function ChatSidebar({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  const toggleCheckpointExpansion = (index: number) => {
+    setExpandedCheckpoints((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }))
+  }
+
+  // Format timestamp from content if available
+  const extractTimestamp = (content: string): string => {
+    // Try to extract timestamp in format like "Created on March 30, 2023 at 14:30"
+    const match = content.match(/Created on ([^(]+)/)
+    if (match && match[1]) {
+      return match[1].trim()
+    }
+    return "Checkpoint"
+  }
+
   // Add a fixed width to the chat sidebar to prevent it from shrinking
   return (
     <div className="w-[300px] min-w-[300px] border-r border-purple-900/20 bg-[#13111C] flex flex-col h-full">
@@ -79,21 +99,50 @@ export default function ChatSidebar({
               className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2 ${message.role === "git" ? "justify-center" : ""}`}
             >
               {message.role === "git" ? (
-                <div className="max-w-[90%] rounded-xl px-5 py-3 my-2 bg-indigo-500/10 border border-indigo-500/20 text-sm">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="h-3 w-3 rounded-full bg-indigo-400"></div>
-                    <span className="font-medium text-indigo-300">
-                      {message.action === "commit" ? "Checkpoint Created" : "Checkpoint Restored"}
-                    </span>
+                <div className="w-full px-1">
+                  <div className="flex items-center justify-between bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-3.5 w-3.5 text-indigo-400" />
+                      <div className="flex items-center">
+                        <span className="text-indigo-300 font-medium">
+                          {message.action === "commit" ? "Checkpoint" : "Restored"}
+                        </span>
+                        {message.action === "commit" && message.content && (
+                          <button
+                            onClick={() => toggleCheckpointExpansion(index)}
+                            className="ml-1.5 text-indigo-400 hover:text-indigo-300 focus:outline-none"
+                          >
+                            {expandedCheckpoints[index] ? (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {message.action === "commit" && message.hash && onRestoreCheckpoint && (
+                      <button
+                        onClick={() => onRestoreCheckpoint(message.hash!)}
+                        disabled={restoringCheckpoint !== null}
+                        className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded flex items-center transition-colors"
+                      >
+                        {restoringCheckpoint === message.hash ? (
+                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent mr-1"></span>
+                        ) : (
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                        )}
+                        {restoringCheckpoint === message.hash ? "Restoring" : "Restore"}
+                      </button>
+                    )}
                   </div>
-                  <p className="text-gray-300 mb-2">{message.content}</p>
-                  {message.action === "commit" && message.hash && onRestoreCheckpoint && (
-                    <button
-                      onClick={() => onRestoreCheckpoint(message.hash!)}
-                      className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-md transition-colors"
-                    >
-                      Restore This Version
-                    </button>
+
+                  {/* Expandable content */}
+                  {expandedCheckpoints[index] && message.content && (
+                    <div className="mt-1 ml-6 pl-2 border-l-2 border-indigo-500/20 text-xs text-gray-400">
+                      {message.content}
+                    </div>
                   )}
                 </div>
               ) : (

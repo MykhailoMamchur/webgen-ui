@@ -195,6 +195,8 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [generationError, setGenerationError] = useState<string | null>(null)
+  // Add a state for tracking which checkpoint is being restored
+  const [restoringCheckpoint, setRestoringCheckpoint] = useState<string | null>(null)
 
   // Projects state
   const [projects, setProjects] = useState<Project[]>([])
@@ -716,6 +718,18 @@ export default function Home() {
 
       // Switch to preview tab when generation is complete
       setActiveTab("preview")
+
+      // Fetch the latest messages including git messages
+      try {
+        const serverMessages = await loadMessagesFromServer(currentProject.directory)
+        if (serverMessages && serverMessages.length > 0) {
+          updateCurrentProject({
+            messages: serverMessages,
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching messages after generation:", error)
+      }
     } catch (error) {
       // Check if this was an abort error
       if ((error as Error).name === "AbortError") {
@@ -909,8 +923,8 @@ export default function Home() {
     if (!currentProject) return
 
     try {
-      // Show loading state or notification
-      // You could add a state variable for this if needed
+      // Set loading state
+      setRestoringCheckpoint(hash)
 
       const response = await fetch("/api/git/revert", {
         method: "POST",
@@ -928,23 +942,30 @@ export default function Home() {
         throw new Error(errorData.error || `Failed to restore checkpoint: ${response.status}`)
       }
 
-      // Add a git message to show the revert action
-      const revertMessage = {
-        role: "git" as const,
-        content: "Previous version has been restored successfully.",
-        action: "revert",
-      }
-
-      updateCurrentProject({
-        messages: [...messages, revertMessage],
-      })
-
       // Refresh the project content
-      // This could involve reloading logs or other content
       const serverLogs = await loadLogsFromServer(currentProject.directory)
       if (serverLogs) {
         updateCurrentProject({
           codeContent: serverLogs,
+        })
+      }
+
+      // Fetch the latest messages including the new git revert message
+      const serverMessages = await loadMessagesFromServer(currentProject.directory)
+      if (serverMessages && serverMessages.length > 0) {
+        updateCurrentProject({
+          messages: serverMessages,
+        })
+      } else {
+        // If server messages couldn't be fetched, add a local git message
+        const revertMessage = {
+          role: "git" as const,
+          content: "Previous version has been restored successfully.",
+          action: "revert",
+        }
+
+        updateCurrentProject({
+          messages: [...messages, revertMessage],
         })
       }
 
@@ -953,6 +974,9 @@ export default function Home() {
     } catch (error) {
       console.error("Error restoring checkpoint:", error)
       alert(`Failed to restore checkpoint: ${(error as Error).message}`)
+    } finally {
+      // Clear loading state
+      setRestoringCheckpoint(null)
     }
   }
 
@@ -980,6 +1004,7 @@ export default function Home() {
             selectedElementsCount={selectedElements.length}
             onClearSelectedElements={() => setSelectedElements([])}
             onRestoreCheckpoint={handleRestoreCheckpoint}
+            restoringCheckpoint={restoringCheckpoint}
           />
           <div className="flex-1 flex flex-col w-full min-w-0">
             <Tabs
