@@ -6,9 +6,9 @@ import { Send, Square, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
-// Update the ChatSidebarProps interface to include selected elements info
+// Update the ChatSidebarProps interface to include git messages and onRestoreCheckpoint
 interface ChatSidebarProps {
-  messages: { role: "user" | "assistant"; content: string }[]
+  messages: { role: "user" | "assistant" | "git"; content: string; action?: string; hash?: string }[]
   onSendMessage: (message: string) => void
   isGenerating?: boolean
   onAbortGeneration?: () => void
@@ -16,6 +16,7 @@ interface ChatSidebarProps {
   onCreateProject?: () => void
   selectedElementsCount?: number
   onClearSelectedElements?: () => void
+  onRestoreCheckpoint?: (hash: string) => void
 }
 
 export default function ChatSidebar({
@@ -27,6 +28,7 @@ export default function ChatSidebar({
   onCreateProject,
   selectedElementsCount = 0,
   onClearSelectedElements,
+  onRestoreCheckpoint,
 }: ChatSidebarProps) {
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -74,17 +76,37 @@ export default function ChatSidebar({
           messages.map((message, index) => (
             <div
               key={index}
-              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2`}
+              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2 ${message.role === "git" ? "justify-center" : ""}`}
             >
-              <div
-                className={`max-w-[85%] rounded-xl px-5 py-3 text-sm leading-relaxed ${
-                  message.role === "user"
-                    ? "bg-purple-600 text-white shadow-lg shadow-purple-500/10"
-                    : "bg-purple-500/10 text-purple-50"
-                } whitespace-pre-line`}
-              >
-                {message.content}
-              </div>
+              {message.role === "git" ? (
+                <div className="max-w-[90%] rounded-xl px-5 py-3 my-2 bg-indigo-500/10 border border-indigo-500/20 text-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="h-3 w-3 rounded-full bg-indigo-400"></div>
+                    <span className="font-medium text-indigo-300">
+                      {message.action === "commit" ? "Checkpoint Created" : "Checkpoint Restored"}
+                    </span>
+                  </div>
+                  <p className="text-gray-300 mb-2">{message.content}</p>
+                  {message.action === "commit" && message.hash && onRestoreCheckpoint && (
+                    <button
+                      onClick={() => onRestoreCheckpoint(message.hash!)}
+                      className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-md transition-colors"
+                    >
+                      Restore This Version
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div
+                  className={`max-w-[85%] rounded-xl px-5 py-3 text-sm leading-relaxed ${
+                    message.role === "user"
+                      ? "bg-purple-600 text-white shadow-lg shadow-purple-500/10"
+                      : "bg-purple-500/10 text-purple-50"
+                  } whitespace-pre-line`}
+                >
+                  {message.content}
+                </div>
+              )}
             </div>
           ))
         )}

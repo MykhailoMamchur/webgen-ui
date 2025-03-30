@@ -7,7 +7,12 @@ export interface Project {
   directory: string
   websiteContent: string
   codeContent: string
-  messages: { role: "user" | "assistant"; content: string }[]
+  messages: {
+    role: "user" | "assistant" | "git"
+    content: string
+    action?: string
+    hash?: string
+  }[]
   status?: "running" | "stopped" | "exited"
   port?: number | null
 }

@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
 
     // Simply pass through the messages from the server
+    // The server will now include git messages with role, content, action, and hash properties
     return NextResponse.json(data)
   } catch (error) {
     return NextResponse.json(

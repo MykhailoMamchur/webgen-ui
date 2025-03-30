@@ -904,6 +904,58 @@ export default function Home() {
     }
   }
 
+  // Add the handleRestoreCheckpoint function
+  const handleRestoreCheckpoint = async (hash: string) => {
+    if (!currentProject) return
+
+    try {
+      // Show loading state or notification
+      // You could add a state variable for this if needed
+
+      const response = await fetch("/api/git/revert", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          project_name: currentProject.directory,
+          commit_hash: hash,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to restore checkpoint: ${response.status}`)
+      }
+
+      // Add a git message to show the revert action
+      const revertMessage = {
+        role: "git" as const,
+        content: "Previous version has been restored successfully.",
+        action: "revert",
+      }
+
+      updateCurrentProject({
+        messages: [...messages, revertMessage],
+      })
+
+      // Refresh the project content
+      // This could involve reloading logs or other content
+      const serverLogs = await loadLogsFromServer(currentProject.directory)
+      if (serverLogs) {
+        updateCurrentProject({
+          codeContent: serverLogs,
+        })
+      }
+
+      // Switch to generation tab to show the restored code
+      setActiveTab("generation")
+    } catch (error) {
+      console.error("Error restoring checkpoint:", error)
+      alert(`Failed to restore checkpoint: ${(error as Error).message}`)
+    }
+  }
+
   // Fix the width issues by adding a min-width to the main content area
   return (
     <ThemeProvider attribute="class" defaultTheme="dark">
@@ -927,6 +979,7 @@ export default function Home() {
             onCreateProject={() => setIsNewProjectModalOpen(true)}
             selectedElementsCount={selectedElements.length}
             onClearSelectedElements={() => setSelectedElements([])}
+            onRestoreCheckpoint={handleRestoreCheckpoint}
           />
           <div className="flex-1 flex flex-col w-full min-w-0">
             <Tabs
