@@ -138,7 +138,7 @@ const Prism = {
         inside: {
           rule: /^@[\w-]+/,
           "selector-function-argument": {
-            pattern: /(\bselector\s*$$\s*(?![\s)]))(?:[^()\s]|\s+(?![\s)])|$$(?:[^()]|\([^()]*$$)*$$)+(?=\s*\))/,
+            pattern: /(\bselector\s*$$\s*(?![\s)]))(?:[^()\s]|\s+(?![\s)])|$$(?:[^()]|$$[^()]*$$)*$$)+(?=\s*$$)/,
             lookbehind: true,
             alias: "selector",
           },

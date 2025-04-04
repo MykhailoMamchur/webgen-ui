@@ -2,14 +2,32 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { Send, Square, Plus, X, Clock, RotateCcw, ChevronDown, ChevronRight, ChevronUp } from "lucide-react"
+import {
+  Send,
+  Square,
+  Plus,
+  X,
+  Clock,
+  RotateCcw,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Paperclip,
+  ImageIcon,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
-// Update the ChatSidebarProps interface to include git messages and onRestoreCheckpoint
+// Define an interface for image data
+interface ImageData {
+  file: File
+  previewUrl: string
+}
+
+// Update the ChatSidebarProps interface to include image handling
 interface ChatSidebarProps {
   messages: { role: "user" | "assistant" | "git"; content: string; action?: string; hash?: string }[]
-  onSendMessage: (message: string) => void
+  onSendMessage: (message: string, images?: ImageData[]) => void
   isGenerating?: boolean
   onAbortGeneration?: () => void
   noProjectSelected?: boolean
@@ -35,10 +53,19 @@ export default function ChatSidebar({
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [expandedCheckpoints, setExpandedCheckpoints] = useState<Record<number, boolean>>({})
-  // Add state for expanded messages
   const [expandedMessages, setExpandedMessages] = useState<Record<number, boolean>>({})
-  // Add state to track checkpoint counts
   const [checkpointCounts, setCheckpointCounts] = useState<Record<string, number>>({})
+
+  // Update state for multiple images
+  const [selectedImages, setSelectedImages] = useState<ImageData[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const dropAreaRef = useRef<HTMLDivElement>(null)
+
+  // Add a ref for the textarea to better control it
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Maximum number of images allowed
+  const MAX_IMAGES = 5
 
   // Calculate checkpoint numbers when messages change
   useEffect(() => {
@@ -69,24 +96,189 @@ export default function ChatSidebar({
       return
     }
 
-    if (input.trim()) {
-      onSendMessage(input)
+    if (input.trim() || selectedImages.length > 0) {
+      onSendMessage(input, selectedImages.length > 0 ? selectedImages : undefined)
       setInput("")
+      // Clear the images after sending
+      setSelectedImages([])
+
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "120px" // Reset to initial height
+      }
     }
   }
+
+  // Convert file to base64
+  const fileToImageData = async (file: File): Promise<ImageData> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        resolve({
+          file,
+          previewUrl: reader.result as string,
+        })
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  // Handle file selection
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      // Check if adding these files would exceed the limit
+      if (selectedImages.length + e.target.files.length > MAX_IMAGES) {
+        alert(`You can only upload a maximum of ${MAX_IMAGES} images.`)
+        return
+      }
+
+      const newImages: ImageData[] = []
+
+      for (let i = 0; i < e.target.files.length; i++) {
+        const file = e.target.files[i]
+        if (file.type.startsWith("image/")) {
+          try {
+            const imageData = await fileToImageData(file)
+            newImages.push(imageData)
+          } catch (error) {
+            console.error("Error processing image:", error)
+          }
+        }
+      }
+
+      if (newImages.length > 0) {
+        setSelectedImages((prev) => [...prev, ...newImages])
+      }
+
+      // Reset the input to allow selecting the same file again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+    }
+  }
+
+  // Handle image button click
+  const handleImageButtonClick = () => {
+    if (selectedImages.length >= MAX_IMAGES) {
+      alert(`You can only upload a maximum of ${MAX_IMAGES} images.`)
+      return
+    }
+    fileInputRef.current?.click()
+  }
+
+  // Handle removing a specific image
+  const handleRemoveImage = (index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // Handle removing all images
+  const handleRemoveAllImages = () => {
+    setSelectedImages([])
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  useEffect(() => {
+    const dropArea = dropAreaRef.current
+    if (!dropArea) return
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      dropArea.classList.add("bg-purple-500/10")
+    }
+
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      dropArea.classList.remove("bg-purple-500/10")
+    }
+
+    const handleDrop = async (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      dropArea.classList.remove("bg-purple-500/10")
+
+      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+        // Check if adding these files would exceed the limit
+        if (selectedImages.length + e.dataTransfer.files.length > MAX_IMAGES) {
+          alert(`You can only upload a maximum of ${MAX_IMAGES} images.`)
+          return
+        }
+
+        const newImages: ImageData[] = []
+
+        for (let i = 0; i < e.dataTransfer.files.length; i++) {
+          const file = e.dataTransfer.files[i]
+          if (file.type.startsWith("image/")) {
+            try {
+              const imageData = await fileToImageData(file)
+              newImages.push(imageData)
+            } catch (error) {
+              console.error("Error processing image:", error)
+            }
+          } else {
+            alert("Please drop only image files")
+            return
+          }
+        }
+
+        if (newImages.length > 0) {
+          setSelectedImages((prev) => [...prev, ...newImages])
+        }
+      }
+    }
+
+    // Only add these handlers to the messages area
+    dropArea.addEventListener("dragover", handleDragOver)
+    dropArea.addEventListener("dragleave", handleDragLeave)
+    dropArea.addEventListener("drop", handleDrop)
+
+    return () => {
+      dropArea.removeEventListener("dragover", handleDragOver)
+      dropArea.removeEventListener("dragleave", handleDragLeave)
+      dropArea.removeEventListener("drop", handleDrop)
+    }
+  }, [selectedImages])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  // Add auto-resize effect for textarea with updated height limits
+  useEffect(() => {
+    const resizeTextarea = () => {
+      const textarea = textareaRef.current
+      if (textarea) {
+        // Reset height to initial height to get the correct scrollHeight
+        textarea.style.height = "120px" // Initial height as requested
+
+        // Calculate available height (subtract button area height)
+        const maxHeight = 250 - 56 // 250px max height minus button area (56px = 14px height + padding)
+
+        // Set the height based on content with updated maximum height
+        textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`
+      }
+    }
+
+    // Initial resize
+    resizeTextarea()
+
+    // Resize when input changes
+    if (input !== undefined) {
+      resizeTextarea()
+    }
+  }, [input])
+
   const toggleCheckpointExpansion = (index: number) => {
-    setExpandedCheckpoints((prev) => ({
+    setExpandedCheckpoints((prev: Record<number, boolean>) => ({
       ...prev,
       [index]: !prev[index],
     }))
   }
 
-  // Add function to toggle message expansion
   const toggleMessageExpansion = (index: number) => {
     setExpandedMessages((prev) => ({
       ...prev,
@@ -94,15 +286,12 @@ export default function ChatSidebar({
     }))
   }
 
-  // Check if a message is long and should be collapsible
   const isLongMessage = (content: string): boolean => {
     const lines = content.split("\n")
     return lines.length > 10 || content.length > 600
   }
 
-  // Format timestamp from content if available
   const extractTimestamp = (content: string): string => {
-    // Try to extract timestamp in format like "Created on March 30, 2023 at 14:30"
     const match = content.match(/Created on ([^(]+)/)
     if (match && match[1]) {
       return match[1].trim()
@@ -110,10 +299,9 @@ export default function ChatSidebar({
     return "Checkpoint"
   }
 
-  // Add a fixed width to the chat sidebar to prevent it from shrinking
   return (
-    <div className="w-[300px] min-w-[300px] border-r border-purple-900/20 bg-[#13111C] flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+    <div className="w-[350px] min-w-[350px] border-r border-purple-900/20 bg-[#13111C] flex flex-col h-full">
+      <div ref={dropAreaRef} className="flex-1 overflow-y-auto p-6 space-y-6 transition-colors duration-200">
         {noProjectSelected ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-4">
             <div className="bg-purple-500/10 rounded-lg p-6 mb-4">
@@ -242,58 +430,159 @@ export default function ChatSidebar({
         </div>
       )}
 
-      <div className="p-4 border-t border-purple-900/20">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              noProjectSelected
-                ? "Create a project to start..."
-                : isGenerating
-                  ? "Generation in progress..."
-                  : selectedElementsCount > 0
-                    ? "Describe changes for selected elements..."
-                    : "Describe your website or request changes..."
-            }
-            className="min-h-[80px] resize-none bg-gray-200 dark:bg-gray-300 text-gray-900 border-0 rounded-xl placeholder:text-gray-600 focus-visible:ring-purple-500/30"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                handleSubmit(e)
-              }
+      {/* Only show the input area when a project is selected */}
+      {!noProjectSelected && (
+        <div className="p-4 border-t border-purple-900/20">
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-3"
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              e.currentTarget.classList.add("bg-purple-500/20", "rounded-xl")
             }}
-            disabled={isGenerating}
-          />
-          <Button
-            type="submit"
-            className={`self-end ${
-              noProjectSelected
-                ? "bg-purple-600 hover:bg-purple-500"
-                : isGenerating
-                  ? "bg-red-600 hover:bg-red-500"
-                  : "bg-purple-600 hover:bg-purple-500"
-            } text-white shadow-lg shadow-purple-500/20 rounded-xl px-6`}
+            onDragLeave={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              e.currentTarget.classList.remove("bg-purple-500/20", "rounded-xl")
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              e.currentTarget.classList.remove("bg-purple-500/20", "rounded-xl")
+            }}
           >
-            {noProjectSelected ? (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                New Project
-              </>
-            ) : isGenerating ? (
-              <>
-                <Square className="h-4 w-4 mr-2" />
-                Stop
-              </>
-            ) : (
-              <>
-                <Send className="h-4 w-4 mr-2" />
-                Send
-              </>
+            {/* Multiple images preview */}
+            {selectedImages.length > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-purple-300 font-medium">
+                    {selectedImages.length} image{selectedImages.length !== 1 ? "s" : ""} attached
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRemoveAllImages}
+                    className="text-xs text-purple-400 hover:text-purple-300 flex items-center"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Remove all
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedImages.map((image, index) => (
+                    <div
+                      key={index}
+                      className="relative rounded-lg overflow-hidden border border-purple-500/30 bg-gray-800"
+                    >
+                      <img
+                        src={image.previewUrl || "/placeholder.svg"}
+                        alt={`Image ${index + 1}`}
+                        className="w-full h-20 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(index)}
+                        className="absolute top-1 right-1 bg-gray-900/70 text-white rounded-full p-1 hover:bg-gray-900"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                      <div className="absolute bottom-0 left-0 right-0 bg-gray-900/70 text-white text-xs py-1 px-2 truncate">
+                        {image.file.name}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
-          </Button>
-        </form>
-      </div>
+
+            {/* Input container with controlled height and separated button area */}
+            <div className="relative rounded-xl bg-[#1E1A29] border border-purple-900/20 shadow-inner overflow-hidden">
+              {/* Hidden file input */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/*"
+                className="hidden"
+                disabled={isGenerating}
+                multiple
+              />
+
+              {/* Textarea with fixed max height and bottom padding to make room for buttons */}
+              <div className="relative">
+                <Textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={
+                    isGenerating
+                      ? "Generation in progress..."
+                      : selectedElementsCount > 0
+                        ? "Describe changes for selected elements..."
+                        : selectedImages.length > 0
+                          ? "Describe what to do with these images..."
+                          : "Describe your website or request changes..."
+                  }
+                  className="min-h-[120px] max-h-[250px] w-full resize-none bg-transparent text-gray-200 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 pt-4 pl-4 pr-4 pb-16 overflow-y-auto whitespace-normal break-words"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSubmit(e)
+                    }
+                  }}
+                  disabled={isGenerating}
+                  style={{ height: "120px" }} // Initial height set to 120px as requested
+                />
+              </div>
+
+              {/* Button container in a separate fixed position div */}
+              <div className="absolute bottom-0 left-0 right-0 h-14 bg-[#1E1A29] border-t border-purple-900/10 flex items-center justify-end px-3 z-10">
+                {/* Image counter badge */}
+                {selectedImages.length > 0 && (
+                  <div className="mr-auto bg-purple-600 text-white text-xs rounded-full px-2 py-0.5 flex items-center">
+                    <ImageIcon className="h-3 w-3 mr-1" />
+                    <span>
+                      {selectedImages.length}/{MAX_IMAGES}
+                    </span>
+                  </div>
+                )}
+
+                {/* Image upload button */}
+                <Button
+                  type="button"
+                  onClick={handleImageButtonClick}
+                  className={`bg-[#2A2438] hover:bg-[#352D45] text-gray-300 rounded-lg h-8 w-8 p-0 flex items-center justify-center shadow-sm mr-2 ${
+                    selectedImages.length >= MAX_IMAGES ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  disabled={isGenerating || selectedImages.length >= MAX_IMAGES}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+
+                <Button
+                  type="submit"
+                  className={`${
+                    isGenerating ? "bg-red-600 hover:bg-red-500" : "bg-purple-600 hover:bg-purple-500"
+                  } text-white rounded-lg h-8 px-4 flex items-center gap-1.5 shadow-sm font-medium`}
+                >
+                  {isGenerating ? (
+                    <>
+                      <Square className="h-4 w-4" />
+                      <span>Stop</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      <span>Send</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }

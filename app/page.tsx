@@ -183,6 +183,12 @@ interface SelectedElement {
   html: string
 }
 
+// Define an interface for image data
+interface ImageData {
+  file: File
+  previewUrl: string
+}
+
 // Update the Home component to handle selected elements
 export default function Home() {
   // Add state for selected elements
@@ -553,7 +559,7 @@ export default function Home() {
     }
   }
 
-  const handleStart = async (prompt: string) => {
+  const handleStart = async (prompt: string, image?: File | null) => {
     setIsExiting(true)
 
     // Create a new project if none exists
@@ -603,7 +609,7 @@ export default function Home() {
       setActiveTab("generation")
 
       // Start generating content
-      await generateContent(prompt)
+      await generateContent(prompt, image ? [{ file: image, previewUrl: URL.createObjectURL(image) }] : undefined)
 
       // Fetch the latest messages after generation
       try {
@@ -647,8 +653,18 @@ export default function Home() {
     }, 300)
   }
 
+  // Function to convert image to base64
+  const imageToBase64 = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
   // Replace the generateContent function with this version that uses /edit for both initial generation and edits
-  const generateContent = async (description: string) => {
+  const generateContent = async (description: string, images?: ImageData[]) => {
     if (!currentProjectId || !projectName || !currentProject) return
 
     try {
@@ -681,6 +697,21 @@ export default function Home() {
       // Add selected elements to the request if available
       if (selectedElements.length > 0) {
         requestBody.selected_elements = selectedElements
+      }
+
+      // Add images to the request if available
+      if (images && images.length > 0) {
+        try {
+          const imageData = await Promise.all(
+            images.map(async (img) => ({
+              image: await imageToBase64(img.file),
+              image_name: img.file.name,
+            })),
+          )
+          requestBody.images = imageData
+        } catch (error) {
+          console.error("Error converting images to base64:", error)
+        }
       }
 
       // Pass the abort signal to ensure server-side processing stops when aborted
@@ -811,8 +842,8 @@ export default function Home() {
     setSelectedElements(elements)
   }
 
-  // Remove the editContent function and update handleSendMessage to use generateContent
-  const handleSendMessage = async (message: string) => {
+  // Update handleSendMessage to include multiple images
+  const handleSendMessage = async (message: string, images?: ImageData[]) => {
     if (!currentProjectId || !currentProject) return
 
     // Fetch the latest messages before sending a new message
@@ -825,10 +856,13 @@ export default function Home() {
       console.error("Error fetching messages before sending:", error)
     }
 
-    // Create user message
+    // Create user message with image information
     const userMessage = {
       role: "user" as const,
-      content: message,
+      content:
+        images && images.length > 0
+          ? `${message} [${images.length} image${images.length !== 1 ? "s" : ""} attached: ${images.map((img) => img.file.name).join(", ")}]`
+          : message,
     }
 
     // Add user message
@@ -838,8 +872,8 @@ export default function Home() {
     // Save the user message to the server
     await saveMessageToServer(currentProject.directory, userMessage)
 
-    // Generate new content based on the message
-    await generateContent(message)
+    // Generate new content based on the message and images
+    await generateContent(message, images)
 
     // Clear selected elements after sending
     setSelectedElements([])
