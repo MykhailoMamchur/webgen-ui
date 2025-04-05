@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/components/ui/use-toast"
 
 // Define an interface for image data
 interface ImageData {
@@ -55,6 +56,7 @@ export default function ChatSidebar({
   const [expandedCheckpoints, setExpandedCheckpoints] = useState<Record<number, boolean>>({})
   const [expandedMessages, setExpandedMessages] = useState<Record<number, boolean>>({})
   const [checkpointCounts, setCheckpointCounts] = useState<Record<string, number>>({})
+  const { toast } = useToast()
 
   // Update state for multiple images
   const [selectedImages, setSelectedImages] = useState<ImageData[]>([])
@@ -66,6 +68,9 @@ export default function ChatSidebar({
 
   // Maximum number of images allowed
   const MAX_IMAGES = 5
+
+  // Add a constant for the maximum file size (5MB in bytes)
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB in bytes
 
   // Calculate checkpoint numbers when messages change
   useEffect(() => {
@@ -124,21 +129,107 @@ export default function ChatSidebar({
     })
   }
 
+  // Add a helper function to compress images after the fileToImageData function
+  const compressImage = async (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const img = new Image()
+        img.onload = () => {
+          let width = img.width
+          let height = img.height
+          const quality = 0.7 // Start with 70% quality
+          const maxWidth = 1920 // Max width for very large images
+
+          // If image is very large, scale it down
+          if (width > maxWidth) {
+            const ratio = maxWidth / width
+            width = maxWidth
+            height = Math.round(height * ratio)
+          }
+
+          const canvas = document.createElement("canvas")
+          canvas.width = width
+          canvas.height = height
+
+          const ctx = canvas.getContext("2d")
+          if (!ctx) {
+            reject(new Error("Could not get canvas context"))
+            return
+          }
+
+          ctx.drawImage(img, 0, 0, width, height)
+
+          // Try to compress with decreasing quality until size is under limit
+          const compressAndCheck = (currentQuality: number) => {
+            canvas.toBlob(
+              (blob) => {
+                if (!blob) {
+                  reject(new Error("Could not create blob"))
+                  return
+                }
+
+                if (blob.size <= MAX_IMAGE_SIZE || currentQuality <= 0.1) {
+                  // Create a new file from the blob
+                  const newFile = new File([blob], file.name, {
+                    type: "image/jpeg",
+                    lastModified: Date.now(),
+                  })
+                  resolve(newFile)
+                } else {
+                  // Reduce quality and try again
+                  compressAndCheck(currentQuality - 0.1)
+                }
+              },
+              "image/jpeg",
+              currentQuality,
+            )
+          }
+
+          compressAndCheck(quality)
+        }
+
+        img.onerror = () => {
+          reject(new Error("Failed to load image"))
+        }
+
+        img.src = event.target?.result as string
+      }
+
+      reader.onerror = () => {
+        reject(new Error("Failed to read file"))
+      }
+
+      reader.readAsDataURL(file)
+    })
+  }
+
   // Handle file selection
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       // Check if adding these files would exceed the limit
       if (selectedImages.length + e.target.files.length > MAX_IMAGES) {
-        alert(`You can only upload a maximum of ${MAX_IMAGES} images.`)
+        toast({
+          title: "Image limit reached",
+          description: `You can only upload a maximum of ${MAX_IMAGES} images.`,
+          variant: "warning",
+        })
         return
       }
 
       const newImages: ImageData[] = []
+      let compressionApplied = false
 
       for (let i = 0; i < e.target.files.length; i++) {
-        const file = e.target.files[i]
+        let file = e.target.files[i]
         if (file.type.startsWith("image/")) {
           try {
+            // Check file size and compress if needed
+            if (file.size > MAX_IMAGE_SIZE) {
+              compressionApplied = true
+              file = await compressImage(file)
+            }
+
             const imageData = await fileToImageData(file)
             newImages.push(imageData)
           } catch (error) {
@@ -161,7 +252,11 @@ export default function ChatSidebar({
   // Handle image button click
   const handleImageButtonClick = () => {
     if (selectedImages.length >= MAX_IMAGES) {
-      alert(`You can only upload a maximum of ${MAX_IMAGES} images.`)
+      toast({
+        title: "Image limit reached",
+        description: `You can only upload a maximum of ${MAX_IMAGES} images.`,
+        variant: "warning",
+      })
       return
     }
     fileInputRef.current?.click()
@@ -204,23 +299,38 @@ export default function ChatSidebar({
       if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
         // Check if adding these files would exceed the limit
         if (selectedImages.length + e.dataTransfer.files.length > MAX_IMAGES) {
-          alert(`You can only upload a maximum of ${MAX_IMAGES} images.`)
+          toast({
+            title: "Image limit reached",
+            description: `You can only upload a maximum of ${MAX_IMAGES} images.`,
+            variant: "warning",
+          })
           return
         }
 
         const newImages: ImageData[] = []
+        let compressionApplied = false
 
         for (let i = 0; i < e.dataTransfer.files.length; i++) {
-          const file = e.dataTransfer.files[i]
+          let file = e.dataTransfer.files[i]
           if (file.type.startsWith("image/")) {
             try {
+              // Check file size and compress if needed
+              if (file.size > MAX_IMAGE_SIZE) {
+                compressionApplied = true
+                file = await compressImage(file)
+              }
+
               const imageData = await fileToImageData(file)
               newImages.push(imageData)
             } catch (error) {
               console.error("Error processing image:", error)
             }
           } else {
-            alert("Please drop only image files")
+            toast({
+              title: "Invalid file type",
+              description: "Please drop only image files.",
+              variant: "error",
+            })
             return
           }
         }
@@ -241,7 +351,7 @@ export default function ChatSidebar({
       dropArea.removeEventListener("dragleave", handleDragLeave)
       dropArea.removeEventListener("drop", handleDrop)
     }
-  }, [selectedImages])
+  }, [selectedImages, toast])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
