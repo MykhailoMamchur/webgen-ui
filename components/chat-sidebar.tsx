@@ -72,6 +72,9 @@ export default function ChatSidebar({
   // Add a constant for the maximum file size (5MB in bytes)
   const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB in bytes
 
+  // Maximum allowed dimension in pixels
+  const MAX_DIMENSION = 8000
+
   // Calculate checkpoint numbers when messages change
   useEffect(() => {
     const counts: Record<string, number> = {}
@@ -129,46 +132,47 @@ export default function ChatSidebar({
     })
   }
 
-  // Add a helper function to compress images after the fileToImageData function
-  const compressImage = async (file: File): Promise<File> => {
+  // Process image dimensions and size
+  const processImage = async (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = (event) => {
         const img = new Image()
         img.onload = () => {
-          let width = img.width
-          let height = img.height
-          const quality = 0.7 // Start with 70% quality
-          const maxWidth = 1920 // Max width for very large images
-          const maxDimension = 8000 // Maximum allowed dimension in pixels
+          // Get original dimensions
+          const width = img.width
+          const height = img.height
 
-          // Check if either dimension exceeds the maximum allowed
-          if (width > maxDimension || height > maxDimension) {
-            // Calculate scale factor to bring the larger dimension down to maxDimension
-            const scaleFactor = Math.min(maxDimension / width, maxDimension / height)
-            width = Math.round(width * scaleFactor)
-            height = Math.round(height * scaleFactor)
-          }
-          // If image is very large, scale it down
-          else if (width > maxWidth) {
-            const ratio = maxWidth / width
-            width = maxWidth
-            height = Math.round(height * ratio)
+          // Check if dimensions need scaling
+          const needsScaling = width > MAX_DIMENSION || height > MAX_DIMENSION
+
+          // Calculate new dimensions if scaling is needed
+          let newWidth = width
+          let newHeight = height
+
+          if (needsScaling) {
+            // Calculate scale factor to bring the larger dimension down to MAX_DIMENSION
+            const scaleFactor = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height)
+            newWidth = Math.floor(width * scaleFactor)
+            newHeight = Math.floor(height * scaleFactor)
           }
 
+          // Create canvas with the new dimensions
           const canvas = document.createElement("canvas")
-          canvas.width = width
-          canvas.height = height
+          canvas.width = newWidth
+          canvas.height = newHeight
 
+          // Draw the image on the canvas
           const ctx = canvas.getContext("2d")
           if (!ctx) {
             reject(new Error("Could not get canvas context"))
             return
           }
 
-          ctx.drawImage(img, 0, 0, width, height)
+          // Draw the image with the new dimensions
+          ctx.drawImage(img, 0, 0, newWidth, newHeight)
 
-          // Try to compress with decreasing quality until size is under limit
+          // Check if the file size needs to be reduced
           const compressAndCheck = (currentQuality: number) => {
             canvas.toBlob(
               (blob) => {
@@ -177,6 +181,7 @@ export default function ChatSidebar({
                   return
                 }
 
+                // If the blob size is under the limit or we've reached minimum quality, resolve
                 if (blob.size <= MAX_IMAGE_SIZE || currentQuality <= 0.1) {
                   // Create a new file from the blob
                   const newFile = new File([blob], file.name, {
@@ -194,7 +199,8 @@ export default function ChatSidebar({
             )
           }
 
-          compressAndCheck(quality)
+          // Start with 70% quality
+          compressAndCheck(0.7)
         }
 
         img.onerror = () => {
@@ -226,17 +232,13 @@ export default function ChatSidebar({
       }
 
       const newImages: ImageData[] = []
-      let compressionApplied = false
 
       for (let i = 0; i < e.target.files.length; i++) {
         let file = e.target.files[i]
         if (file.type.startsWith("image/")) {
           try {
-            // Check file size and compress if needed
-            if (file.size > MAX_IMAGE_SIZE) {
-              compressionApplied = true
-              file = await compressImage(file)
-            }
+            // Process the image (resize and compress)
+            file = await processImage(file)
 
             const imageData = await fileToImageData(file)
             newImages.push(imageData)
@@ -316,17 +318,13 @@ export default function ChatSidebar({
         }
 
         const newImages: ImageData[] = []
-        let compressionApplied = false
 
         for (let i = 0; i < e.dataTransfer.files.length; i++) {
           let file = e.dataTransfer.files[i]
           if (file.type.startsWith("image/")) {
             try {
-              // Check file size and compress if needed
-              if (file.size > MAX_IMAGE_SIZE) {
-                compressionApplied = true
-                file = await compressImage(file)
-              }
+              // Process the image (resize and compress)
+              file = await processImage(file)
 
               const imageData = await fileToImageData(file)
               newImages.push(imageData)
