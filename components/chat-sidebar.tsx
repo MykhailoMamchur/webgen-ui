@@ -140,9 +140,17 @@ export default function ChatSidebar({
           let height = img.height
           const quality = 0.7 // Start with 70% quality
           const maxWidth = 1920 // Max width for very large images
+          const maxDimension = 8000 // Maximum allowed dimension in pixels
 
+          // Check if either dimension exceeds the maximum allowed
+          if (width > maxDimension || height > maxDimension) {
+            // Calculate scale factor to bring the larger dimension down to maxDimension
+            const scaleFactor = Math.min(maxDimension / width, maxDimension / height)
+            width = Math.round(width * scaleFactor)
+            height = Math.round(height * scaleFactor)
+          }
           // If image is very large, scale it down
-          if (width > maxWidth) {
+          else if (width > maxWidth) {
             const ratio = maxWidth / width
             width = maxWidth
             height = Math.round(height * ratio)
