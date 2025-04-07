@@ -213,7 +213,7 @@ export default function WebsitePreview({
             </style>
           </head>
           <body>
-            <div class="content">
+            <div className="content">
               <h1>Preview Placeholder</h1>
               <p>Your website preview will appear here after generation is complete.</p>
               <p>The deployment will be prepared automatically when content is ready.</p>
@@ -536,7 +536,11 @@ export default function WebsitePreview({
       <div className="flex items-center p-2 border-b border-border bg-[#13111C]">
         <div className="flex-1 mx-auto max-w-md flex items-center">
           <div className="bg-background border border-input rounded-md px-3 py-1 text-sm text-center truncate flex-1">
-            {deploymentAlias ? deploymentAlias : "preview.manufactura.ai"}
+            {deploymentAlias
+              ? deploymentAlias.startsWith("http")
+                ? deploymentAlias
+                : `https://${deploymentAlias}`
+              : "preview.manufactura.ai"}
           </div>
           <button
             onClick={toggleSelectionMode}
@@ -597,7 +601,7 @@ export default function WebsitePreview({
           <iframe
             key={`preview-${directory}`}
             ref={iframeRef}
-            src={deploymentAlias}
+            src={deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`}
             title="Website Preview"
             className="w-full h-full border-none"
             sandbox="allow-same-origin allow-scripts"
@@ -619,4 +623,3 @@ export default function WebsitePreview({
     </div>
   )
 }
-

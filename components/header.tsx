@@ -93,13 +93,15 @@ export default function Header({
     if (!currentProject?.directory) return
 
     if (deploymentAlias) {
-      // Open the deployment alias URL
-      window.open(deploymentAlias, "_blank")
+      // Ensure the URL has https:// prefix
+      const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
+      window.open(url, "_blank")
     } else {
       // If we don't have an alias yet, try to get one and then open it
       getDeploymentAlias(currentProject.directory).then(() => {
         if (deploymentAlias) {
-          window.open(deploymentAlias, "_blank")
+          const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
+          window.open(url, "_blank")
         }
       })
     }
@@ -172,4 +174,3 @@ export default function Header({
     </header>
   )
 }
-
