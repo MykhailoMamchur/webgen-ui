@@ -20,13 +20,9 @@ interface SelectedElement {
   html: string
 }
 
-interface ProjectStatus {
-  status: "running" | "stopped" | "exited"
-  pid?: number
-  port?: number
-  message: string
-  output?: string
-  exit_code?: number
+interface DeploymentAlias {
+  project_name: string
+  alias: string
 }
 
 // Update the WebsitePreview component to include selection mode
@@ -39,114 +35,55 @@ export default function WebsitePreview({
 }: WebsitePreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [isServerStarted, setIsServerStarted] = useState(false)
-  const [serverPort, setServerPort] = useState<number | null>(null)
+  const [deploymentAlias, setDeploymentAlias] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [hasGeneratedContent, setHasGeneratedContent] = useState(false)
-  const [projectStatus, setProjectStatus] = useState<ProjectStatus | null>(null)
   // Add state for selection mode
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([])
   const [iframeLoaded, setIframeLoaded] = useState(false)
 
-  // Update the checkProjectStatus function to handle the API error gracefully
-  const checkProjectStatus = async () => {
-    if (!directory) return null
-
-    try {
-      // Try the new API endpoint format first
-      let response = await fetch(`/api/projects`)
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.projects && Array.isArray(data.projects)) {
-          // Find the project with matching directory
-          const projectData = data.projects.find((p: any) => p.name === directory)
-          if (projectData) {
-            // Convert to the expected format
-            const status = {
-              status: projectData.status || "stopped",
-              pid: projectData.pid,
-              port: projectData.port,
-              message: projectData.status === "running" ? "Project is running" : "Project is stopped",
-            }
-            setProjectStatus(status)
-
-            if (status.status === "running" && status.port) {
-              setIsServerStarted(true)
-              setServerPort(status.port)
-              return status
-            }
-            return status
-          }
-        }
-      }
-
-      // Fall back to the old endpoint if needed
-      response = await fetch(`/api/process-status/${directory}`)
-      if (response.ok) {
-        const data = await response.json()
-        setProjectStatus(data)
-
-        if (data.status === "running" && data.port) {
-          setIsServerStarted(true)
-          setServerPort(data.port)
-          return data
-        }
-        return data
-      }
-
-      return null
-    } catch (error) {
-      console.error("Error checking project status:", error)
-      return null
-    }
-  }
-
-  // Modify the startServer function to check if server is already started
-  const startServer = async () => {
+  // Replace startServer with getDeploymentAlias
+  const getDeploymentAlias = async () => {
     if (!directory || isGenerating) return
 
     try {
       setIsLoading(true)
       setError(null)
 
-      // First check if the server is already running
-      const status = await checkProjectStatus()
-
-      if (status?.status === "running" && status.port) {
-        // Server is already running
-        setIsServerStarted(true)
-        setServerPort(status.port)
-        setIsLoading(false)
-        return
-      }
-
-      // Call the start API to start the server for this project
-      const response = await fetch("/api/start", {
+      // Call the new deployment/alias API
+      const response = await fetch("/api/deployment/alias", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_name: directory }), // Use original casing
+        body: JSON.stringify({ project_name: directory }),
       })
+
+      // Check if the response is JSON before trying to parse it
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        // If not JSON, get the text and log it for debugging
+        const text = await response.text()
+        console.error("Non-JSON response:", text)
+        throw new Error("Server returned an invalid response format")
+      }
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || `Failed to start server: ${response.status}`)
+        throw new Error(errorData.error || `Failed to get deployment alias: ${response.status}`)
       }
 
-      const data = await response.json()
+      const data = (await response.json()) as DeploymentAlias
 
-      if (data.status === "success" && data.port) {
-        setIsServerStarted(true)
-        setServerPort(data.port)
+      if (data.alias) {
+        setDeploymentAlias(data.alias)
       } else {
-        throw new Error(data.message || "Failed to start server")
+        throw new Error("No alias returned from deployment service")
       }
     } catch (error) {
-      console.error("Error starting server:", error)
-      setError((error as Error).message || "Failed to start server")
+      console.error("Error getting deployment alias:", error)
+      setError((error as Error).message || "Failed to get deployment alias")
     } finally {
       setIsLoading(false)
     }
@@ -166,21 +103,16 @@ export default function WebsitePreview({
       onTabActivated()
     }
 
-    // Check status and start server if needed, but ONLY if not generating
-    if (directory && !isGenerating && !isServerStarted && !isLoading) {
-      checkProjectStatus().then((status) => {
-        if (!status || status.status !== "running") {
-          startServer()
-        }
-      })
+    // Get deployment alias if needed, but ONLY if not generating
+    if (directory && !isGenerating && !deploymentAlias && !isLoading) {
+      getDeploymentAlias()
     }
   }, [])
 
   // Reset state when directory changes, but don't check status during generation
   useEffect(() => {
     // Reset state when directory changes
-    setIsServerStarted(false)
-    setServerPort(null)
+    setDeploymentAlias(null)
     setError(null)
     setIframeLoaded(false)
     setSelectedElements([])
@@ -200,9 +132,9 @@ export default function WebsitePreview({
       }
     }
 
-    // Check if the server for this directory is already running, but ONLY if not generating
+    // Get deployment alias for this directory, but ONLY if not generating
     if (directory && !isGenerating) {
-      checkProjectStatus()
+      getDeploymentAlias()
     }
 
     // Cleanup function
@@ -217,7 +149,7 @@ export default function WebsitePreview({
 
   // Handle iframe content for placeholder
   useEffect(() => {
-    if (iframeRef.current && !isServerStarted && !hasGeneratedContent) {
+    if (iframeRef.current && !deploymentAlias && !hasGeneratedContent) {
       const iframe = iframeRef.current
       const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
 
@@ -284,7 +216,7 @@ export default function WebsitePreview({
             <div class="content">
               <h1>Preview Placeholder</h1>
               <p>Your website preview will appear here after generation is complete.</p>
-              <p>The server will start automatically when content is ready.</p>
+              <p>The deployment will be prepared automatically when content is ready.</p>
             </div>
           </body>
           </html>
@@ -292,9 +224,7 @@ export default function WebsitePreview({
         iframeDoc.close()
       }
     }
-  }, [isServerStarted, hasGeneratedContent])
-
-  // Add this useEffect to inject the selection script when the server starts
+  }, [deploymentAlias, hasGeneratedContent])
 
   // Add a function to toggle selection mode
   const toggleSelectionMode = () => {
@@ -606,7 +536,7 @@ export default function WebsitePreview({
       <div className="flex items-center p-2 border-b border-border bg-[#13111C]">
         <div className="flex-1 mx-auto max-w-md flex items-center">
           <div className="bg-background border border-input rounded-md px-3 py-1 text-sm text-center truncate flex-1">
-            {isServerStarted ? `https://wegenweb.com/project/${directory}` : "preview.manufactura.ai"}
+            {deploymentAlias ? deploymentAlias : "preview.manufactura.ai"}
           </div>
           <button
             onClick={toggleSelectionMode}
@@ -616,7 +546,7 @@ export default function WebsitePreview({
                 : "bg-background border border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             }`}
             title={isSelectionMode ? "Disable selection mode" : "Enable selection mode"}
-            disabled={!isServerStarted || isGenerating || !iframeLoaded}
+            disabled={!deploymentAlias || isGenerating || !iframeLoaded}
           >
             <Pointer className="h-4 w-4" />
           </button>
@@ -643,7 +573,7 @@ export default function WebsitePreview({
           <div className="absolute inset-0 flex items-center justify-center bg-[#0A090F]/80 z-10">
             <div className="flex flex-col items-center">
               <Loader2 className="h-8 w-8 text-purple-400 animate-spin mb-2" />
-              <p className="text-purple-200">Starting server...</p>
+              <p className="text-purple-200">Preparing deployment...</p>
             </div>
           </div>
         )}
@@ -651,10 +581,10 @@ export default function WebsitePreview({
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#0A090F]/80 z-10">
             <div className="bg-[#13111C] p-6 rounded-lg border border-red-500/30 max-w-md">
-              <h3 className="text-red-400 font-medium mb-2">Error Starting Server</h3>
+              <h3 className="text-red-400 font-medium mb-2">Error Preparing Deployment</h3>
               <p className="text-gray-300 text-sm">{error}</p>
               <button
-                onClick={startServer}
+                onClick={getDeploymentAlias}
                 className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-md text-sm"
               >
                 Retry
@@ -663,11 +593,11 @@ export default function WebsitePreview({
           </div>
         )}
 
-        {isServerStarted && serverPort ? (
+        {deploymentAlias ? (
           <iframe
             key={`preview-${directory}`}
             ref={iframeRef}
-            src={`https://wegenweb.com/project/${directory}`}
+            src={deploymentAlias}
             title="Website Preview"
             className="w-full h-full border-none"
             sandbox="allow-same-origin allow-scripts"

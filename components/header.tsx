@@ -17,13 +17,9 @@ interface HeaderProps {
   isGenerating?: boolean
 }
 
-interface ProjectStatus {
-  status: "running" | "stopped" | "exited"
-  pid?: number
-  port?: number
-  message: string
-  output?: string
-  exit_code?: number
+interface DeploymentAlias {
+  project_name: string
+  alias: string
 }
 
 export default function Header({
@@ -36,96 +32,77 @@ export default function Header({
   isGenerating = false,
 }: HeaderProps) {
   const { theme, setTheme } = useTheme()
-  const [projectStatus, setProjectStatus] = useState<ProjectStatus | null>(null)
+  const [deploymentAlias, setDeploymentAlias] = useState<string | null>(null)
+  const [isLoadingAlias, setIsLoadingAlias] = useState(false)
 
-  // Ensure we don't check status during generation
-  // Check project status only when the current project changes and not generating
+  // Check for deployment alias when the current project changes
   useEffect(() => {
     if (currentProject?.directory && !isGenerating) {
-      checkProjectStatus(currentProject.directory)
+      getDeploymentAlias(currentProject.directory)
     } else {
-      setProjectStatus(null)
+      setDeploymentAlias(null)
     }
-    // No polling interval - only check when project changes and not generating
   }, [currentProject, isGenerating])
 
-  // Function to check project status
-  const checkProjectStatus = async (directory: string) => {
+  // Function to get deployment alias
+  const getDeploymentAlias = async (directory: string) => {
     try {
-      // Try the new API endpoint format first
-      let response = await fetch(`/api/projects`)
+      setIsLoadingAlias(true)
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.projects && Array.isArray(data.projects)) {
-          // Find the project with matching directory
-          const projectData = data.projects.find((p: any) => p.name === directory)
-          if (projectData) {
-            // Convert to the expected format
-            const status = {
-              status: projectData.status || "stopped",
-              pid: projectData.pid,
-              port: projectData.port,
-              message: projectData.status === "running" ? "Project is running" : "Project is stopped",
-            }
-            setProjectStatus(status)
-            return status
-          }
-        }
-      }
-
-      // Fall back to the old endpoint if needed
-      response = await fetch(`/api/process-status/${directory}`)
-      if (response.ok) {
-        const data = await response.json()
-        setProjectStatus(data)
-        return data
-      }
-
-      // If both fail, set a default status
-      setProjectStatus({ status: "stopped", message: "Unable to determine project status" })
-      return null
-    } catch (error) {
-      console.error("Error checking project status:", error)
-      setProjectStatus({ status: "stopped", message: "Error checking status" })
-      return null
-    }
-  }
-
-  // Function to start the project
-  const startProject = async () => {
-    if (!currentProject?.directory) return null
-
-    try {
-      const response = await fetch("/api/start", {
+      const response = await fetch("/api/deployment/alias", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_name: currentProject.directory }),
+        body: JSON.stringify({ project_name: directory }),
       })
 
-      if (response.ok) {
-        // Check status after starting
-        const status = await checkProjectStatus(currentProject.directory)
-        return status
+      // Check if the response is JSON before trying to parse it
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        // If not JSON, get the text and log it for debugging
+        const text = await response.text()
+        console.error("Non-JSON response:", text)
+        throw new Error("Server returned an invalid response format")
       }
-      return null
+
+      if (response.ok) {
+        const data = (await response.json()) as DeploymentAlias
+        if (data.alias) {
+          setDeploymentAlias(data.alias)
+        } else {
+          throw new Error("No alias returned from deployment service")
+        }
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to get deployment alias: ${response.status}`)
+      }
     } catch (error) {
-      console.error("Error starting project:", error)
-      return null
+      console.error("Error getting deployment alias:", error)
+      setDeploymentAlias(null)
+    } finally {
+      setIsLoadingAlias(false)
     }
   }
 
   // Determine if the preview button should be enabled
-  const isPreviewEnabled = currentProject?.directory && (!isGenerating || projectStatus?.status === "running")
+  const isPreviewEnabled = currentProject?.directory && !isLoadingAlias && (!isGenerating || deploymentAlias !== null)
 
   // Handle preview button click
   const handlePreviewClick = () => {
     if (!currentProject?.directory) return
 
-    // Simply open the project in a new tab without starting it
-    window.open(`https://wegenweb.com/project/${currentProject.directory}`, "_blank")
+    if (deploymentAlias) {
+      // Open the deployment alias URL
+      window.open(deploymentAlias, "_blank")
+    } else {
+      // If we don't have an alias yet, try to get one and then open it
+      getDeploymentAlias(currentProject.directory).then(() => {
+        if (deploymentAlias) {
+          window.open(deploymentAlias, "_blank")
+        }
+      })
+    }
   }
 
   return (
@@ -164,7 +141,14 @@ export default function Header({
           onClick={handlePreviewClick}
           disabled={!isPreviewEnabled}
         >
-          Preview
+          {isLoadingAlias ? (
+            <>
+              <span className="mr-2">Loading</span>
+              <span className="animate-pulse">...</span>
+            </>
+          ) : (
+            "Preview"
+          )}
         </Button>
         <Button variant="ghost" size="icon" className="text-purple-300 hover:text-purple-200 hover:bg-purple-500/10">
           <span className="sr-only">Settings</span>
@@ -180,7 +164,7 @@ export default function Header({
             strokeLinejoin="round"
             className="lucide lucide-settings"
           >
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.08a2 2 0 0 1 1 1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
             <circle cx="12" cy="12" r="3"></circle>
           </svg>
         </Button>
