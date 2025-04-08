@@ -118,4 +118,3 @@ export default function NewProjectModal({ isOpen, onClose, onCreateProject }: Ne
     </div>
   )
 }
-

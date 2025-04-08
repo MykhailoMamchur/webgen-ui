@@ -481,4 +481,3 @@ export default function GenerationCodeView({ code, isGenerating = false }: CodeV
     </div>
   )
 }
-

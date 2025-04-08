@@ -44,4 +44,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Failed to start server: ${(error as Error).message}` }, { status: 500 })
   }
 }
-

@@ -308,4 +308,3 @@ export default function ProjectFilesTab({ projectName }: ProjectFilesTabProps) {
     </div>
   )
 }
-

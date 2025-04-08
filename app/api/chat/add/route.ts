@@ -57,4 +57,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Failed to add message: ${(error as Error).message}` }, { status: 500 })
   }
 }
-

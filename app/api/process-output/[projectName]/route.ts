@@ -30,4 +30,3 @@ export async function GET(request: NextRequest, { params }: { params: { projectN
     return NextResponse.json({ error: `Failed to get process output: ${(error as Error).message}` }, { status: 500 })
   }
 }
-

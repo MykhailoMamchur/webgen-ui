@@ -46,4 +46,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Failed to delete project: ${(error as Error).message}` }, { status: 500 })
   }
 }
-

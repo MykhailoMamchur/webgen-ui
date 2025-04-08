@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the request to the external API
-    const externalApiUrl = "https://wegenweb.com/api/deployment/alias"
+    const externalApiUrl = "https://wegenweb.com/api/deployment"
 
     const response = await fetch(externalApiUrl, {
       method: "POST",
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in deployment alias API:", error)
+    console.error("Error in deployment API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

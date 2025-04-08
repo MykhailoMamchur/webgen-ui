@@ -51,4 +51,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Failed to restore checkpoint: ${(error as Error).message}` }, { status: 500 })
   }
 }
-

@@ -10,9 +10,9 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Tabs } from "@/components/tabs"
 import GenerationCodeView from "@/components/generation-code-view"
 import ProjectFilesTab from "@/components/project-files-tab"
-import DeploymentsTab from "@/components/deployments-tab"
 import type { Project, ProjectSummary } from "@/types/project"
 import { v4 as uuidv4 } from "uuid"
+import DeploymentModal from "@/components/deployment-modal"
 
 // Update the DEFAULT_HTML to be empty
 const DEFAULT_HTML = ``
@@ -203,6 +203,8 @@ export default function Home() {
   const [generationError, setGenerationError] = useState<string | null>(null)
   // Add a state for tracking which checkpoint is being restored
   const [restoringCheckpoint, setRestoringCheckpoint] = useState<string | null>(null)
+  // Add state for deployment modal
+  const [isDeploymentModalOpen, setIsDeploymentModalOpen] = useState(false)
 
   // Projects state
   const [projects, setProjects] = useState<Project[]>([])
@@ -916,11 +918,16 @@ export default function Home() {
     }
   }
 
+  // Handle deployment
+  const handleDeploy = () => {
+    if (!currentProject) return
+    setIsDeploymentModalOpen(true)
+  }
+
   const tabs = [
     { id: "preview", label: "Preview" },
     { id: "generation", label: "Generation" },
     { id: "project-files", label: "Project Files" },
-    { id: "deployments", label: "Deployments" },
   ]
 
   // For the project selector dropdown
@@ -1100,6 +1107,7 @@ export default function Home() {
           onDeleteProject={deleteProject}
           onRenameProject={handleRenameProject}
           isGenerating={isGenerating}
+          onDeploy={handleDeploy}
         />
         <div className="flex flex-1 overflow-hidden">
           <ChatSidebar
@@ -1138,8 +1146,6 @@ export default function Home() {
                 />
               ) : activeTab === "project-files" ? (
                 <ProjectFilesTab projectName={currentProject?.directory || ""} />
-              ) : activeTab === "deployments" ? (
-                <DeploymentsTab />
               ) : (
                 <GenerationCodeView code={codeContent} isGenerating={isGenerating} />
               )}
@@ -1158,8 +1164,15 @@ export default function Home() {
           onClose={() => setIsNewProjectModalOpen(false)}
           onCreateProject={createProject}
         />
+
+        {isDeploymentModalOpen && currentProject && (
+          <DeploymentModal
+            isOpen={isDeploymentModalOpen}
+            onClose={() => setIsDeploymentModalOpen(false)}
+            projectName={currentProject.directory}
+          />
+        )}
       </div>
     </ThemeProvider>
   )
 }
-

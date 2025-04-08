@@ -36,4 +36,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Failed to load logs: ${(error as Error).message}`, logs: "" }, { status: 500 })
   }
 }
-

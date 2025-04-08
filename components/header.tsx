@@ -1,6 +1,6 @@
 "use client"
 
-import { Moon, Sun, Sparkles } from "lucide-react"
+import { Moon, Sun, Sparkles, ExternalLink, Rocket } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ interface HeaderProps {
   onDeleteProject: (projectId: string) => Promise<void>
   onRenameProject?: (projectId: string, newName: string) => void
   isGenerating?: boolean
+  onDeploy?: () => void
 }
 
 interface DeploymentAlias {
@@ -30,10 +31,13 @@ export default function Header({
   onDeleteProject,
   onRenameProject,
   isGenerating = false,
+  onDeploy,
 }: HeaderProps) {
   const { theme, setTheme } = useTheme()
   const [deploymentAlias, setDeploymentAlias] = useState<string | null>(null)
   const [isLoadingAlias, setIsLoadingAlias] = useState(false)
+  // Add an error state to track deployment alias failures
+  const [deploymentError, setDeploymentError] = useState<boolean>(false)
 
   // Check for deployment alias when the current project changes
   useEffect(() => {
@@ -44,10 +48,11 @@ export default function Header({
     }
   }, [currentProject, isGenerating])
 
-  // Function to get deployment alias
+  // Update the getDeploymentAlias function to handle errors properly
   const getDeploymentAlias = async (directory: string) => {
     try {
       setIsLoadingAlias(true)
+      setDeploymentError(false)
 
       const response = await fetch("/api/deployment/alias", {
         method: "POST",
@@ -63,6 +68,7 @@ export default function Header({
         // If not JSON, get the text and log it for debugging
         const text = await response.text()
         console.error("Non-JSON response:", text)
+        setDeploymentError(true)
         throw new Error("Server returned an invalid response format")
       }
 
@@ -71,22 +77,26 @@ export default function Header({
         if (data.alias) {
           setDeploymentAlias(data.alias)
         } else {
+          setDeploymentError(true)
           throw new Error("No alias returned from deployment service")
         }
       } else {
         const errorData = await response.json()
+        setDeploymentError(true)
         throw new Error(errorData.error || `Failed to get deployment alias: ${response.status}`)
       }
     } catch (error) {
       console.error("Error getting deployment alias:", error)
       setDeploymentAlias(null)
+      setDeploymentError(true)
     } finally {
       setIsLoadingAlias(false)
     }
   }
 
-  // Determine if the preview button should be enabled
-  const isPreviewEnabled = currentProject?.directory && !isLoadingAlias && (!isGenerating || deploymentAlias !== null)
+  // Update the isPreviewEnabled condition to check for deployment errors
+  const isPreviewEnabled =
+    currentProject?.directory && !isLoadingAlias && ((!isGenerating && !deploymentError) || deploymentAlias !== null)
 
   // Handle preview button click
   const handlePreviewClick = () => {
@@ -109,12 +119,12 @@ export default function Header({
 
   return (
     <header className="border-b border-purple-900/20 bg-[#13111C] h-16 flex items-center px-6 sticky top-0 z-10">
-      <div className="flex items-center gap-2">
-        <Sparkles className="h-6 w-6 text-white animate-pulse-slow" />
-        <h1 className="text-2xl font-bold tracking-tight text-white">manufactura.ai</h1>
-      </div>
+      <div className="flex items-center">
+        <div className="flex items-center gap-2 mr-8">
+          <Sparkles className="h-5 w-5 text-purple-400" />
+          <h1 className="text-xl font-semibold tracking-tight text-white">manufactura.ai</h1>
+        </div>
 
-      <div className="ml-8">
         <ProjectSelector
           currentProject={currentProject}
           projects={projects}
@@ -126,7 +136,7 @@ export default function Header({
         />
       </div>
 
-      <div className="ml-auto flex items-center gap-4">
+      <div className="ml-auto flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
@@ -138,37 +148,27 @@ export default function Header({
           <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
           <span className="sr-only">Toggle theme</span>
         </Button>
+
         <Button
-          className="bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:via-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-purple-500/20 rounded-xl px-6"
+          variant="outline"
+          size="sm"
           onClick={handlePreviewClick}
           disabled={!isPreviewEnabled}
+          className="bg-background/30 border-purple-500/30 text-purple-100 hover:bg-purple-500/20 hover:text-white"
         >
-          {isLoadingAlias ? (
-            <>
-              <span className="mr-2">Loading</span>
-              <span className="animate-pulse">...</span>
-            </>
-          ) : (
-            "Preview"
-          )}
+          <ExternalLink className="h-4 w-4 mr-2" />
+          Preview
         </Button>
-        <Button variant="ghost" size="icon" className="text-purple-300 hover:text-purple-200 hover:bg-purple-500/10">
-          <span className="sr-only">Settings</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="lucide lucide-settings"
-          >
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.08a2 2 0 0 1 1 1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
+
+        <Button
+          variant="default"
+          size="sm"
+          onClick={onDeploy}
+          disabled={!currentProject || isGenerating}
+          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
+        >
+          <Rocket className="h-4 w-4 mr-2" />
+          Deploy
         </Button>
       </div>
     </header>

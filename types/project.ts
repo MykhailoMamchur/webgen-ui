@@ -18,4 +18,3 @@ export interface Project {
 }
 
 export type ProjectSummary = Pick<Project, "id" | "name" | "description" | "createdAt" | "updatedAt" | "directory">
-

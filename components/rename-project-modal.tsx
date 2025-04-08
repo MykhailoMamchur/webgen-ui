@@ -124,4 +124,3 @@ export default function RenameProjectModal({ isOpen, onClose, onRenameProject, c
     </div>
   )
 }
-

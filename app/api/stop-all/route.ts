@@ -30,4 +30,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Failed to stop all servers: ${(error as Error).message}` }, { status: 500 })
   }
 }
-

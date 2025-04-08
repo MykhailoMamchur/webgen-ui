@@ -983,4 +983,3 @@ export default function CodeView({ code, isGenerating = false }: CodeViewProps) 
     </div>
   )
 }
-
