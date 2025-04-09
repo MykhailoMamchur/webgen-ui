@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Rocket, Check, ExternalLink, Loader2 } from "lucide-react"
+import { X, Check, ExternalLink, Loader2, Globe, Copy, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Separator } from "@/components/ui/separator"
 
 interface DeploymentModalProps {
   isOpen: boolean
@@ -20,8 +21,8 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
   const [deploymentStatus, setDeploymentStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [deploymentAlias, setDeploymentAlias] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Add state to track if we're creating a deployment
   const [isCreatingDeployment, setIsCreatingDeployment] = useState<boolean>(false)
+  const [copied, setCopied] = useState<boolean>(false)
 
   // Update the useEffect to handle initial loading
   useEffect(() => {
@@ -30,7 +31,8 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
     }
   }, [isOpen, projectName])
 
-  // Update the getDeploymentAlias function to create a deployment if it fails
+  // Replace the getDeploymentAlias and createDeployment functions with these corrected versions:
+
   const getDeploymentAlias = async () => {
     try {
       setDeploymentStatus("loading")
@@ -57,16 +59,18 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
 
       if (!response.ok) {
         const errorData = await response.json()
+        console.error("Error checking alias:", errorData)
         // If alias check fails, try to create a deployment
         return createDeployment()
       }
 
-      const data = (await response.json()) as DeploymentAlias
+      const data = await response.json()
 
       if (data.alias) {
         setDeploymentAlias(data.alias)
         setDeploymentStatus("success")
       } else {
+        console.error("No alias in response:", data)
         // If no alias is returned, try to create a deployment
         return createDeployment()
       }
@@ -105,20 +109,48 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
         throw new Error(errorData.error || `Failed to create deployment: ${response.status}`)
       }
 
-      const data = await response.json()
-
-      if (data.alias) {
-        setDeploymentAlias(data.alias)
-        setDeploymentStatus("success")
-      } else {
-        throw new Error("No alias returned from deployment creation")
-      }
+      // After successful deployment creation, check for the alias again
+      return checkDeploymentAlias()
     } catch (error) {
       console.error("Error creating deployment:", error)
       setError((error as Error).message || "Failed to create deployment")
       setDeploymentStatus("error")
     } finally {
       setIsCreatingDeployment(false)
+    }
+  }
+
+  // Add a new function to check for the deployment alias after creating a deployment
+  const checkDeploymentAlias = async () => {
+    try {
+      // Wait a moment to ensure the deployment has been processed
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Call the deployment/alias API again
+      const response = await fetch("/api/deployment/alias", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ project_name: projectName }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to get deployment alias: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.alias) {
+        setDeploymentAlias(data.alias)
+        setDeploymentStatus("success")
+      } else {
+        throw new Error("No alias returned after deployment creation")
+      }
+    } catch (error) {
+      console.error("Error checking deployment alias after creation:", error)
+      setError((error as Error).message || "Failed to get deployment alias")
+      setDeploymentStatus("error")
     }
   }
 
@@ -130,81 +162,157 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
     }
   }
 
+  const handleCopyUrl = () => {
+    if (deploymentAlias) {
+      const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
+      navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md bg-[#13111C] border-purple-900/20">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-white">
-            <Rocket className="h-5 w-5 text-purple-400" />
-            Deployment Status
-          </DialogTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="absolute right-4 top-4 text-gray-400 hover:text-white"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </DialogHeader>
-
-        <div className="p-6">
-          {deploymentStatus === "loading" && (
-            <div className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="h-10 w-10 text-purple-500 animate-spin mb-4" />
-              <p className="text-gray-300 text-center">
-                {isCreatingDeployment
-                  ? "Creating deployment for " + projectName + "..."
-                  : "Preparing deployment for " + projectName + "..."}
-              </p>
-            </div>
-          )}
-
-          {deploymentStatus === "error" && (
-            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-4">
-              <h3 className="text-red-400 font-medium mb-2">Deployment Error</h3>
-              <p className="text-gray-300 text-sm">{error || "An unknown error occurred"}</p>
+      <DialogContent className="sm:max-w-md bg-[#0A090F] border-gray-800 p-0 overflow-hidden rounded-xl">
+        {deploymentStatus === "loading" ? (
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-medium text-white">Deploying</h2>
               <Button
-                variant="outline"
-                size="sm"
-                onClick={getDeploymentAlias}
-                className="mt-4 border-red-500/30 text-red-300 hover:bg-red-900/20"
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="absolute right-3 top-3 text-gray-400 hover:text-white h-7 w-7"
               >
-                Retry
+                <X className="h-3.5 w-3.5" />
               </Button>
             </div>
-          )}
 
-          {deploymentStatus === "success" && (
-            <div className="flex flex-col items-center">
-              <div className="bg-green-900/20 border border-green-500/30 rounded-full p-3 mb-4">
-                <Check className="h-8 w-8 text-green-400" />
+            <div className="flex items-center gap-2 mb-6">
+              <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
+              <span className="text-sm text-white font-medium">Building</span>
+              <span className="text-xs text-gray-400 ml-1">{projectName}</span>
+            </div>
+
+            <div className="mb-5">
+              <h3 className="text-xs text-gray-400 mb-3">Settings</h3>
+
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-[#13111C] border border-gray-800">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-white">Set a custom domain</span>
+                </div>
+                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white h-7 px-2" disabled>
+                  Configure
+                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
               </div>
+            </div>
 
-              <h3 className="text-xl font-medium text-white mb-2">Deployment Successful!</h3>
-              <p className="text-gray-400 text-center mb-6">
-                Your project has been successfully deployed and is now live.
-              </p>
+            <Button
+              className="w-full bg-[#13111C] hover:bg-[#1A1825] text-white border border-gray-800 h-9 text-sm"
+              disabled
+            >
+              <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+              Deploying
+            </Button>
+          </div>
+        ) : deploymentStatus === "error" ? (
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-medium text-white">Deployment Error</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="absolute right-3 top-3 text-gray-400 hover:text-white h-7 w-7"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
 
-              <div className="w-full bg-background/30 border border-purple-900/20 rounded-md p-3 mb-6">
-                <p className="text-sm text-gray-400 mb-1">Deployment URL:</p>
-                <div className="flex items-center">
-                  <span className="text-purple-300 font-mono text-sm truncate">
-                    {deploymentAlias?.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`}
-                  </span>
+            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 mb-5">
+              <p className="text-sm text-gray-300">{error || "An unknown error occurred during deployment."}</p>
+            </div>
+
+            <Button
+              onClick={getDeploymentAlias}
+              className="w-full bg-[#13111C] hover:bg-[#1A1825] text-white border border-gray-800 h-9 text-sm"
+            >
+              Retry Deployment
+            </Button>
+          </div>
+        ) : deploymentStatus === "success" && deploymentAlias ? (
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-medium text-white">Deployment Complete</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="absolute right-3 top-3 text-gray-400 hover:text-white h-7 w-7"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="h-9 w-9 rounded-full bg-green-900 flex items-center justify-center">
+                <Check className="h-4 w-4 text-green-400" />
+              </div>
+              <div>
+                <h3 className="text-sm text-white font-medium">Successfully deployed</h3>
+                <p className="text-xs text-gray-400">{projectName}</p>
+              </div>
+            </div>
+
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs text-gray-400">Deployment URL</h3>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleOpenDeployment}
+                    className="text-gray-400 hover:text-white h-7 w-7 p-0"
+                    title="Open deployment"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopyUrl}
+                    className="text-gray-400 hover:text-white h-7 w-7 p-0"
+                    title="Copy URL"
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  </Button>
                 </div>
               </div>
-
-              <Button
-                onClick={handleOpenDeployment}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open Deployment
-              </Button>
+              <div className="bg-[#13111C] border border-gray-800 rounded-lg p-2.5 font-mono text-xs text-purple-300 break-all">
+                {deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`}
+              </div>
             </div>
-          )}
-        </div>
+
+            <Separator className="bg-gray-800 my-5" />
+
+            <div className="mb-5">
+              <h3 className="text-xs text-gray-400 mb-3">Domain Settings</h3>
+
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-[#13111C] border border-gray-800">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-white">Set a custom domain</span>
+                </div>
+                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white h-7 px-2">
+                  Configure
+                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </DialogContent>
     </Dialog>
   )

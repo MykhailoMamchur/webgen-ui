@@ -6,7 +6,6 @@ import ChatSidebar from "@/components/chat-sidebar"
 import WebsitePreview from "@/components/website-preview"
 import WelcomeScreen from "@/components/welcome-screen"
 import NewProjectModal from "@/components/new-project-modal"
-import { ThemeProvider } from "@/components/theme-provider"
 import { Tabs } from "@/components/tabs"
 import GenerationCodeView from "@/components/generation-code-view"
 import ProjectFilesTab from "@/components/project-files-tab"
@@ -1097,82 +1096,80 @@ export default function Home() {
 
   // Fix the width issues by adding a min-width to the main content area
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark">
-      <div className="flex flex-col h-screen bg-[#0A090F]">
-        <Header
-          currentProject={currentProjectSummary}
-          projects={projectSummaries}
-          onSelectProject={handleSelectProject}
-          onNewProject={() => setIsNewProjectModalOpen(true)}
-          onDeleteProject={deleteProject}
-          onRenameProject={handleRenameProject}
+    <div className="flex flex-col h-screen bg-[#0A090F]">
+      <Header
+        currentProject={currentProjectSummary}
+        projects={projectSummaries}
+        onSelectProject={handleSelectProject}
+        onNewProject={() => setIsNewProjectModalOpen(true)}
+        onDeleteProject={deleteProject}
+        onRenameProject={handleRenameProject}
+        isGenerating={isGenerating}
+        onDeploy={handleDeploy}
+      />
+      <div className="flex flex-1 overflow-hidden">
+        <ChatSidebar
+          messages={messages}
+          onSendMessage={handleSendMessage}
           isGenerating={isGenerating}
-          onDeploy={handleDeploy}
+          onAbortGeneration={abortGeneration}
+          noProjectSelected={!currentProjectId}
+          onCreateProject={() => setIsNewProjectModalOpen(true)}
+          selectedElementsCount={selectedElements.length}
+          onClearSelectedElements={() => setSelectedElements([])}
+          onRestoreCheckpoint={handleRestoreCheckpoint}
+          restoringCheckpoint={restoringCheckpoint}
         />
-        <div className="flex flex-1 overflow-hidden">
-          <ChatSidebar
-            messages={messages}
-            onSendMessage={handleSendMessage}
+        <div className="flex-1 flex flex-col w-full min-w-0">
+          <Tabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onChange={handleTabChange}
+            className="bg-[#13111C]"
             isGenerating={isGenerating}
-            onAbortGeneration={abortGeneration}
-            noProjectSelected={!currentProjectId}
-            onCreateProject={() => setIsNewProjectModalOpen(true)}
-            selectedElementsCount={selectedElements.length}
-            onClearSelectedElements={() => setSelectedElements([])}
-            onRestoreCheckpoint={handleRestoreCheckpoint}
-            restoringCheckpoint={restoringCheckpoint}
           />
-          <div className="flex-1 flex flex-col w-full min-w-0">
-            <Tabs
-              tabs={tabs}
-              activeTab={activeTab}
-              onChange={handleTabChange}
-              className="bg-[#13111C]"
-              isGenerating={isGenerating}
-            />
-            <div className="flex-1 overflow-hidden">
-              {activeTab === "preview" ? (
-                <WebsitePreview
-                  content={websiteContent}
-                  directory={currentProject?.directory || ""}
-                  isGenerating={isGenerating}
-                  onTabActivated={() => {
-                    // Only check status when preview tab is activated and NOT generating
-                    if (currentProject?.directory && !isGenerating) {
-                      // Status check will happen inside the component
-                    }
-                  }}
-                  onElementsSelected={handleElementsSelected}
-                />
-              ) : activeTab === "project-files" ? (
-                <ProjectFilesTab projectName={currentProject?.directory || ""} />
-              ) : (
-                <GenerationCodeView code={codeContent} isGenerating={isGenerating} />
-              )}
-            </div>
+          <div className="flex-1 overflow-hidden">
+            {activeTab === "preview" ? (
+              <WebsitePreview
+                content={websiteContent}
+                directory={currentProject?.directory || ""}
+                isGenerating={isGenerating}
+                onTabActivated={() => {
+                  // Only check status when preview tab is activated and NOT generating
+                  if (currentProject?.directory && !isGenerating) {
+                    // Status check will happen inside the component
+                  }
+                }}
+                onElementsSelected={handleElementsSelected}
+              />
+            ) : activeTab === "project-files" ? (
+              <ProjectFilesTab projectName={currentProject?.directory || ""} />
+            ) : (
+              <GenerationCodeView code={codeContent} isGenerating={isGenerating} />
+            )}
           </div>
         </div>
-
-        {showWelcome && (
-          <div className={isExiting ? "welcome-overlay-exit welcome-overlay-exit-active" : ""}>
-            <WelcomeScreen onStart={handleStart} />
-          </div>
-        )}
-
-        <NewProjectModal
-          isOpen={isNewProjectModalOpen}
-          onClose={() => setIsNewProjectModalOpen(false)}
-          onCreateProject={createProject}
-        />
-
-        {isDeploymentModalOpen && currentProject && (
-          <DeploymentModal
-            isOpen={isDeploymentModalOpen}
-            onClose={() => setIsDeploymentModalOpen(false)}
-            projectName={currentProject.directory}
-          />
-        )}
       </div>
-    </ThemeProvider>
+
+      {showWelcome && (
+        <div className={isExiting ? "welcome-overlay-exit welcome-overlay-exit-active" : ""}>
+          <WelcomeScreen onStart={handleStart} />
+        </div>
+      )}
+
+      <NewProjectModal
+        isOpen={isNewProjectModalOpen}
+        onClose={() => setIsNewProjectModalOpen(false)}
+        onCreateProject={createProject}
+      />
+
+      {isDeploymentModalOpen && currentProject && (
+        <DeploymentModal
+          isOpen={isDeploymentModalOpen}
+          onClose={() => setIsDeploymentModalOpen(false)}
+          projectName={currentProject.directory}
+        />
+      )}
+    </div>
   )
 }

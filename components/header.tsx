@@ -1,7 +1,6 @@
 "use client"
 
-import { Moon, Sun, Sparkles, ExternalLink, Rocket } from "lucide-react"
-import { useTheme } from "next-themes"
+import { Sparkles, ExternalLink, Upload } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import ProjectSelector from "@/components/project-selector"
@@ -33,7 +32,6 @@ export default function Header({
   isGenerating = false,
   onDeploy,
 }: HeaderProps) {
-  const { theme, setTheme } = useTheme()
   const [deploymentAlias, setDeploymentAlias] = useState<string | null>(null)
   const [isLoadingAlias, setIsLoadingAlias] = useState(false)
   // Add an error state to track deployment alias failures
@@ -138,18 +136,6 @@ export default function Header({
 
       <div className="ml-auto flex items-center gap-3">
         <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="text-purple-300 hover:text-purple-200 hover:bg-purple-500/10"
-          aria-label="Toggle theme"
-        >
-          <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">Toggle theme</span>
-        </Button>
-
-        <Button
           variant="outline"
           size="sm"
           onClick={handlePreviewClick}
@@ -167,7 +153,7 @@ export default function Header({
           disabled={!currentProject || isGenerating}
           className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
         >
-          <Rocket className="h-4 w-4 mr-2" />
+          <Upload className="h-4 w-4 mr-2" />
           Deploy
         </Button>
       </div>

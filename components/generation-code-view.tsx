@@ -198,12 +198,15 @@ const extractFileActionsFromLogs = (logs: string, isGenerating: boolean): React.
     if (match.index > lastIndex) {
       const textBefore = logs.substring(lastIndex, match.index)
       if (textBefore.trim()) {
+        // Escape HTML characters in regular text
+        const escapedText = textBefore.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
         result.push(
           <div
             key={`text-${result.length}`}
             className="font-mono text-sm text-gray-300 my-2 whitespace-pre"
             dangerouslySetInnerHTML={{
-              __html: convertAnsiToHtml(textBefore).replace(/\n/g, "<br />"),
+              __html: convertAnsiToHtml(escapedText).replace(/\n/g, "<br />"),
             }}
           />,
         )
@@ -295,12 +298,15 @@ const extractFileActionsFromLogs = (logs: string, isGenerating: boolean): React.
       if (partialActionMatch.index > 0) {
         const textBefore = remainingText.substring(0, partialActionMatch.index)
         if (textBefore.trim()) {
+          // Escape HTML characters in regular text
+          const escapedText = textBefore.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
           result.push(
             <div
               key={`text-${result.length}`}
               className="font-mono text-sm text-gray-300 my-2 whitespace-pre"
               dangerouslySetInnerHTML={{
-                __html: convertAnsiToHtml(textBefore).replace(/\n/g, "<br />"),
+                __html: convertAnsiToHtml(escapedText).replace(/\n/g, "<br />"),
               }}
             />,
           )
@@ -378,12 +384,15 @@ const extractFileActionsFromLogs = (logs: string, isGenerating: boolean): React.
   if (!hasPartialAction && lastIndex < logs.length) {
     const remainingText = logs.substring(lastIndex)
     if (remainingText.trim()) {
+      // Escape HTML characters in regular text
+      const escapedText = remainingText.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
       result.push(
         <div
           key={`text-${result.length}`}
           className="font-mono text-sm text-gray-300 my-2 whitespace-pre"
           dangerouslySetInnerHTML={{
-            __html: convertAnsiToHtml(remainingText).replace(/\n/g, "<br />"),
+            __html: convertAnsiToHtml(escapedText).replace(/\n/g, "<br />"),
           }}
         />,
       )
