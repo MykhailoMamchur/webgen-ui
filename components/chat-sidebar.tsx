@@ -563,16 +563,16 @@ export default function ChatSidebar({
                 </div>
               ) : (
                 <div
-                  className={`max-w-[85%] rounded-xl px-5 py-3 text-sm leading-relaxed ${
+                  className={`max-w-[85%] rounded-xl px-5 py-3 text-sm leading-relaxed overflow-hidden ${
                     message.role === "user"
                       ? "bg-purple-600 text-white shadow-lg shadow-purple-500/10"
                       : "bg-purple-500/10 text-purple-50"
                   }`}
                 >
                   {isLongMessage(message.content) ? (
-                    <div>
+                    <div className="w-full break-words overflow-hidden">
                       {/* Show preview or full content based on expanded state */}
-                      <div className={expandedMessages[index] ? "" : "line-clamp-3 whitespace-pre-line"}>
+                      <div className={expandedMessages[index] ? "break-words" : "line-clamp-3 break-words"}>
                         {message.content}
                       </div>
 
@@ -595,7 +595,7 @@ export default function ChatSidebar({
                       </button>
                     </div>
                   ) : (
-                    <div className="whitespace-pre-line">{message.content}</div>
+                    <div className="break-words overflow-hidden">{message.content}</div>
                   )}
                 </div>
               )}
