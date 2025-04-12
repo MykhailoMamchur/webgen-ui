@@ -182,10 +182,15 @@ interface SelectedElement {
   html: string
 }
 
-// Define an interface for image data
+// Update the ImageData interface to match the one in chat-sidebar.tsx
 interface ImageData {
   file: File
   previewUrl: string
+  rawBase64?: string
+  originalFormat?: string
+  wasConverted?: boolean
+  originalWidth?: number | null
+  originalHeight?: number | null
 }
 
 // Update the Home component to handle selected elements
@@ -704,10 +709,22 @@ export default function Home() {
       if (images && images.length > 0) {
         try {
           const imageData = await Promise.all(
-            images.map(async (img) => ({
-              image: await imageToBase64(img.file),
-              image_name: img.file.name,
-            })),
+            images.map(async (img) => {
+              // Get the processed image as base64
+              const processedBase64 = await imageToBase64(img.file)
+
+              return {
+                image: processedBase64,
+                image_name: img.file.name,
+                // Always include the raw image data
+                image_raw: img.rawBase64,
+                // Include the original format
+                image_format: img.originalFormat || null,
+                // Include the original dimensions
+                width_raw: img.originalWidth || null,
+                height_raw: img.originalHeight || null,
+              }
+            }),
           )
           requestBody.images = imageData
         } catch (error) {

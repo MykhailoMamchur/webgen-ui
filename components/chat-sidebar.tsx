@@ -23,6 +23,11 @@ import { useToast } from "@/components/ui/use-toast"
 interface ImageData {
   file: File
   previewUrl: string
+  rawBase64?: string
+  originalFormat?: string
+  wasConverted?: boolean
+  originalWidth?: number | null
+  originalHeight?: number | null
 }
 
 // Update the ChatSidebarProps interface to include image handling
@@ -69,8 +74,9 @@ export default function ChatSidebar({
   // Maximum number of images allowed
   const MAX_IMAGES = 5
 
-  // Add a constant for the maximum file size (5MB in bytes)
-  const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB in bytes
+  // Define size limits
+  const COMPRESS_SIZE_THRESHOLD = 5 * 1024 * 1024 // 5MB in bytes
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10MB in bytes
 
   // Maximum allowed dimension in pixels
   const MAX_DIMENSION = 8000
@@ -117,23 +123,48 @@ export default function ChatSidebar({
     }
   }
 
-  // Convert file to base64
+  // Replace the fileToImageData function with this version that captures original dimensions
   const fileToImageData = async (file: File): Promise<ImageData> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => {
-        resolve({
-          file,
-          previewUrl: reader.result as string,
-        })
+        // Create a temporary image to get the original dimensions
+        const img = new Image()
+        img.onload = () => {
+          resolve({
+            file,
+            previewUrl: reader.result as string,
+            rawBase64: reader.result as string,
+            originalFormat: file.type,
+            wasConverted: false,
+            originalWidth: img.width,
+            originalHeight: img.height,
+          })
+        }
+        img.onerror = () => {
+          // If we can't load the image, resolve without dimensions
+          resolve({
+            file,
+            previewUrl: reader.result as string,
+            rawBase64: reader.result as string,
+            originalFormat: file.type,
+            wasConverted: false,
+            originalWidth: null,
+            originalHeight: null,
+          })
+        }
+        img.src = reader.result as string
       }
       reader.onerror = reject
       reader.readAsDataURL(file)
     })
   }
 
-  // Process image dimensions and size
-  const processImage = async (file: File): Promise<File> => {
+  // Update the processImage function to always convert to JPG and always mark as converted
+  const processImage = async (file: File, originalImageData: ImageData): Promise<File> => {
+    // Always mark as converted since we're always processing to JPG
+    originalImageData.wasConverted = true
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = (event) => {
@@ -143,64 +174,8 @@ export default function ChatSidebar({
           const width = img.width
           const height = img.height
 
-          // Check if dimensions need scaling
-          const needsScaling = width > MAX_DIMENSION || height > MAX_DIMENSION
-
-          // Calculate new dimensions if scaling is needed
-          let newWidth = width
-          let newHeight = height
-
-          if (needsScaling) {
-            // Calculate scale factor to bring the larger dimension down to MAX_DIMENSION
-            const scaleFactor = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height)
-            newWidth = Math.floor(width * scaleFactor)
-            newHeight = Math.floor(height * scaleFactor)
-          }
-
-          // Create canvas with the new dimensions
-          const canvas = document.createElement("canvas")
-          canvas.width = newWidth
-          canvas.height = newHeight
-
-          // Draw the image on the canvas
-          const ctx = canvas.getContext("2d")
-          if (!ctx) {
-            reject(new Error("Could not get canvas context"))
-            return
-          }
-
-          // Draw the image with the new dimensions
-          ctx.drawImage(img, 0, 0, newWidth, newHeight)
-
-          // Check if the file size needs to be reduced
-          const compressAndCheck = (currentQuality: number) => {
-            canvas.toBlob(
-              (blob) => {
-                if (!blob) {
-                  reject(new Error("Could not create blob"))
-                  return
-                }
-
-                // If the blob size is under the limit or we've reached minimum quality, resolve
-                if (blob.size <= MAX_IMAGE_SIZE || currentQuality <= 0.1) {
-                  // Create a new file from the blob
-                  const newFile = new File([blob], file.name, {
-                    type: "image/jpeg",
-                    lastModified: Date.now(),
-                  })
-                  resolve(newFile)
-                } else {
-                  // Reduce quality and try again
-                  compressAndCheck(currentQuality - 0.1)
-                }
-              },
-              "image/jpeg",
-              currentQuality,
-            )
-          }
-
-          // Start with 70% quality
-          compressAndCheck(0.7)
+          // Process the image
+          processWithCanvas(file, img, width, height, resolve, reject, originalImageData)
         }
 
         img.onerror = () => {
@@ -218,7 +193,77 @@ export default function ChatSidebar({
     })
   }
 
-  // Handle file selection
+  // Helper function to process image with canvas - always convert to JPG
+  const processWithCanvas = (
+    file: File,
+    img: HTMLImageElement,
+    width: number,
+    height: number,
+    resolve: (file: File) => void,
+    reject: (error: Error) => void,
+    originalImageData: ImageData,
+  ) => {
+    // Check if dimensions need scaling
+    const needsScaling = width > MAX_DIMENSION || height > MAX_DIMENSION
+
+    // Calculate new dimensions if scaling is needed
+    let newWidth = width
+    let newHeight = height
+
+    if (needsScaling) {
+      // Calculate scale factor to bring the larger dimension down to MAX_DIMENSION
+      const scaleFactor = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height)
+      newWidth = Math.floor(width * scaleFactor)
+      newHeight = Math.floor(height * scaleFactor)
+    }
+
+    // Create canvas with the new dimensions
+    const canvas = document.createElement("canvas")
+    canvas.width = newWidth
+    canvas.height = newHeight
+
+    // Draw the image on the canvas
+    const ctx = canvas.getContext("2d")
+    if (!ctx) {
+      reject(new Error("Could not get canvas context"))
+      return
+    }
+
+    // Draw the image with the new dimensions
+    ctx.drawImage(img, 0, 0, newWidth, newHeight)
+
+    // Check if the file size needs to be reduced
+    const compressAndCheck = (currentQuality: number) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("Could not create blob"))
+            return
+          }
+
+          // If the blob size is under the limit or we've reached minimum quality, resolve
+          if (blob.size <= COMPRESS_SIZE_THRESHOLD || currentQuality <= 0.1) {
+            // Create a new file from the blob
+            const newFile = new File([blob], file.name, {
+              type: "image/jpeg",
+              lastModified: Date.now(),
+            })
+            resolve(newFile)
+          } else {
+            // Reduce quality and try again
+            compressAndCheck(currentQuality - 0.1)
+          }
+        },
+        "image/jpeg",
+        currentQuality,
+      )
+    }
+
+    // Start with 70% quality
+    compressAndCheck(0.7)
+  }
+
+  // Update the handleFileSelect function to use the updated image processing
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       // Check if adding these files would exceed the limit
@@ -237,13 +282,34 @@ export default function ChatSidebar({
         let file = e.target.files[i]
         if (file.type.startsWith("image/")) {
           try {
-            // Process the image (resize and compress)
-            file = await processImage(file)
+            // Check file size first - reject files > 10MB
+            if (file.size > MAX_IMAGE_SIZE) {
+              toast({
+                title: "File too large",
+                description: `The file "${file.name}" exceeds the maximum size of 10MB.`,
+                variant: "error",
+              })
+              continue
+            }
 
+            // First create the image data with the original file
             const imageData = await fileToImageData(file)
+
+            // Process the image (resize and compress if needed)
+            file = await processImage(file, imageData)
+
+            // Update the file and previewUrl in imageData
+            imageData.file = file
+            imageData.previewUrl = URL.createObjectURL(file)
+
             newImages.push(imageData)
           } catch (error) {
             console.error("Error processing image:", error)
+            toast({
+              title: "Error processing image",
+              description: `Failed to process "${file.name}". Please try another image.`,
+              variant: "error",
+            })
           }
         }
       }
@@ -259,29 +325,74 @@ export default function ChatSidebar({
     }
   }
 
-  // Handle image button click
-  const handleImageButtonClick = () => {
-    if (selectedImages.length >= MAX_IMAGES) {
-      toast({
-        title: "Image limit reached",
-        description: `You can only upload a maximum of ${MAX_IMAGES} images.`,
-        variant: "warning",
-      })
-      return
+  // Update the handleDrop function to use the updated image processing
+  const handleDrop = async (e: DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const dropArea = dropAreaRef.current
+    if (dropArea) {
+      dropArea.classList.remove("bg-purple-500/10")
     }
-    fileInputRef.current?.click()
-  }
 
-  // Handle removing a specific image
-  const handleRemoveImage = (index: number) => {
-    setSelectedImages((prev) => prev.filter((_, i) => i !== index))
-  }
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      // Check if adding these files would exceed the limit
+      if (selectedImages.length + e.dataTransfer.files.length > MAX_IMAGES) {
+        toast({
+          title: "Image limit reached",
+          description: `You can only upload a maximum of ${MAX_IMAGES} images.`,
+          variant: "warning",
+        })
+        return
+      }
 
-  // Handle removing all images
-  const handleRemoveAllImages = () => {
-    setSelectedImages([])
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+      const newImages: ImageData[] = []
+
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        let file = e.dataTransfer.files[i]
+        if (file.type.startsWith("image/")) {
+          try {
+            // Check file size first - reject files > 10MB
+            if (file.size > MAX_IMAGE_SIZE) {
+              toast({
+                title: "File too large",
+                description: `The file "${file.name}" exceeds the maximum size of 10MB.`,
+                variant: "error",
+              })
+              continue
+            }
+
+            // First create the image data with the original file
+            const imageData = await fileToImageData(file)
+
+            // Process the image (resize and compress if needed)
+            file = await processImage(file, imageData)
+
+            // Update the file and previewUrl in imageData
+            imageData.file = file
+            imageData.previewUrl = URL.createObjectURL(file)
+
+            newImages.push(imageData)
+          } catch (error) {
+            console.error("Error processing image:", error)
+            toast({
+              title: "Error processing image",
+              description: `Failed to process "${file.name}". Please try another image.`,
+              variant: "error",
+            })
+          }
+        } else {
+          toast({
+            title: "Invalid file type",
+            description: "Please drop only image files.",
+            variant: "error",
+          })
+          return
+        }
+      }
+
+      if (newImages.length > 0) {
+        setSelectedImages((prev) => [...prev, ...newImages])
+      }
     }
   }
 
@@ -301,53 +412,7 @@ export default function ChatSidebar({
       dropArea.classList.remove("bg-purple-500/10")
     }
 
-    const handleDrop = async (e: DragEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      dropArea.classList.remove("bg-purple-500/10")
-
-      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-        // Check if adding these files would exceed the limit
-        if (selectedImages.length + e.dataTransfer.files.length > MAX_IMAGES) {
-          toast({
-            title: "Image limit reached",
-            description: `You can only upload a maximum of ${MAX_IMAGES} images.`,
-            variant: "warning",
-          })
-          return
-        }
-
-        const newImages: ImageData[] = []
-
-        for (let i = 0; i < e.dataTransfer.files.length; i++) {
-          let file = e.dataTransfer.files[i]
-          if (file.type.startsWith("image/")) {
-            try {
-              // Process the image (resize and compress)
-              file = await processImage(file)
-
-              const imageData = await fileToImageData(file)
-              newImages.push(imageData)
-            } catch (error) {
-              console.error("Error processing image:", error)
-            }
-          } else {
-            toast({
-              title: "Invalid file type",
-              description: "Please drop only image files.",
-              variant: "error",
-            })
-            return
-          }
-        }
-
-        if (newImages.length > 0) {
-          setSelectedImages((prev) => [...prev, ...newImages])
-        }
-      }
-    }
-
-    // Only add these handlers to the messages area
+    // Add event listeners for drag and drop
     dropArea.addEventListener("dragover", handleDragOver)
     dropArea.addEventListener("dragleave", handleDragLeave)
     dropArea.addEventListener("drop", handleDrop)
@@ -413,6 +478,18 @@ export default function ChatSidebar({
       return match[1].trim()
     }
     return "Checkpoint"
+  }
+
+  const handleRemoveAllImages = () => {
+    setSelectedImages([])
+  }
+
+  const handleRemoveImage = (index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleImageButtonClick = () => {
+    fileInputRef.current?.click()
   }
 
   return (
