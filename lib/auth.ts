@@ -3,10 +3,20 @@
 // Base URL for the wegenweb API
 const API_BASE_URL = "https://wegenweb.com/api"
 
-// Helper function to get the auth token from localStorage
+// Helper function to get the auth token from cookies
 export const getAuthToken = (): string | null => {
   if (typeof window !== "undefined") {
-    return localStorage.getItem("auth_token")
+    // Try to get from cookie first
+    const cookies = document.cookie.split(";").reduce(
+      (acc, cookie) => {
+        const [key, value] = cookie.trim().split("=")
+        acc[key] = value
+        return acc
+      },
+      {} as Record<string, string>,
+    )
+
+    return cookies["access_token"] || null
   }
   return null
 }
@@ -127,18 +137,18 @@ export async function getCurrentUser() {
 // Refresh token
 export async function refreshToken() {
   try {
-    const data = await authFetch("/auth/refresh")
+    const response = await fetch("/api/auth/refresh", {
+      method: "POST",
+      credentials: "include", // Include cookies in the request
+    })
 
-    // Update token in localStorage if a new one is returned
-    if (data.token) {
-      localStorage.setItem("auth_token", data.token)
+    if (!response.ok) {
+      throw new Error("Failed to refresh token")
     }
 
-    return data
+    return await response.json()
   } catch (error) {
     console.error("Failed to refresh token:", error)
-    // Clear token from localStorage on refresh failure
-    localStorage.removeItem("auth_token")
     throw error
   }
 }

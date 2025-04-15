@@ -4,14 +4,15 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
-import { loginUser, registerUser, logoutUser, resetPassword, getCurrentUser } from "@/lib/auth"
+import { loginUser, registerUser, logoutUser, resetPassword, getCurrentUser, refreshToken } from "@/lib/auth"
 
+// Update the User interface to match the API response
 export interface User {
   id: string
   email: string
+  created_at?: string
   name?: string
   emailVerified?: boolean
-  createdAt?: string
   updatedAt?: string
 }
 
@@ -74,26 +75,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Set up token refresh interval
   const setupTokenRefresh = () => {
-    // Refresh token every 25 minutes (assuming 30 min expiry)
+    // Refresh token every 50 minutes (assuming 1 hour expiry for access token)
     const refreshInterval = setInterval(
       async () => {
         try {
           // Use our API route for token refresh
-          const response = await fetch("/api/auth/refresh", {
-            method: "POST",
-            credentials: "include", // Include cookies in the request
-          })
-
-          if (!response.ok) {
-            throw new Error("Token refresh failed")
-          }
-
-          const data = await response.json()
-
-          // Update localStorage if needed
-          if (data.token) {
-            localStorage.setItem("auth_token", data.token)
-          }
+          await refreshToken()
         } catch (error) {
           console.error("Token refresh failed:", error)
           // If refresh fails, log the user out
@@ -101,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           clearInterval(refreshInterval)
         }
       },
-      25 * 60 * 1000, // 25 minutes
+      50 * 60 * 1000, // 50 minutes
     )
 
     return refreshInterval
@@ -111,13 +98,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleLogin = async (email: string, password: string) => {
     try {
       setIsLoading(true)
-      const { user: userData, token } = await loginUser(email, password)
-
-      // Save token to localStorage
-      localStorage.setItem("auth_token", token)
+      const { user, access_token, refresh_token } = await loginUser(email, password)
 
       // Update user state
-      setUser(userData)
+      setUser(user)
 
       // Set up token refresh
       setupTokenRefresh()
@@ -148,13 +132,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSignup = async (email: string, password: string, passwordConfirm: string) => {
     try {
       setIsLoading(true)
-      const { user: userData, token } = await registerUser(email, password, passwordConfirm)
-
-      // Save token to localStorage
-      localStorage.setItem("auth_token", token)
+      const { user, access_token, refresh_token } = await registerUser(email, password, passwordConfirm)
 
       // Update user state
-      setUser(userData)
+      setUser(user)
 
       // Set up token refresh
       setupTokenRefresh()

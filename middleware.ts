@@ -11,7 +11,7 @@ export function middleware(request: NextRequest) {
   const isPublicPath = path === "/login" || path === "/signup" || path === "/reset-password" || path === "/verify-email"
 
   // Check if user is authenticated
-  const token = request.cookies.get("auth_token")?.value
+  const token = request.cookies.get("access_token")?.value
   const isAuthenticated = !!token
 
   // Redirect logic

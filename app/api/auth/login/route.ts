@@ -34,27 +34,39 @@ export async function POST(request: NextRequest) {
     // Parse the response data
     const data = await response.json()
 
-    // Set the auth token in a cookie
-    const response2 = NextResponse.json({
+    // Create the response object
+    const apiResponse = NextResponse.json({
       user: data.user,
-      token: data.token,
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
       message: "Login successful",
     })
 
-    // Set a secure HTTP-only cookie with the token
-    // Expires in 7 days
-    response2.cookies.set({
-      name: "auth_token",
-      value: data.token,
+    // Set the access token in a cookie
+    apiResponse.cookies.set({
+      name: "access_token",
+      value: data.access_token,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // Changed from strict to lax to allow cross-site requests
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      sameSite: "lax",
+      maxAge: 60 * 60, // 1 hour
       path: "/",
-      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined, // Use root domain in production
+      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined,
     })
 
-    return response2
+    // Set the refresh token in a cookie
+    apiResponse.cookies.set({
+      name: "refresh_token",
+      value: data.refresh_token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined,
+    })
+
+    return apiResponse
   } catch (error) {
     console.error("Error in login API route:", error)
     return NextResponse.json({ error: `Failed to login: ${(error as Error).message}` }, { status: 500 })

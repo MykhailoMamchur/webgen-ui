@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 export async function GET(request: NextRequest) {
   try {
     // Get the auth token from the request cookies
-    const token = request.cookies.get("auth_token")?.value
+    const token = request.cookies.get("access_token")?.value
 
     // If no token, return an empty projects array instead of an error
     if (!token) {

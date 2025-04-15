@@ -2,16 +2,20 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the auth token from the request cookies
-    const token = request.cookies.get("auth_token")?.value
+    // Get the access token from the request cookies
+    const accessToken = request.cookies.get("access_token")?.value
+    const refreshToken = request.cookies.get("refresh_token")?.value
 
     // Forward the request to the API endpoint
     const response = await fetch("https://wegenweb.com/api/auth/logout", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
+      body: JSON.stringify({
+        refresh_token: refreshToken,
+      }),
     })
 
     // Create a response
@@ -20,16 +24,28 @@ export async function POST(request: NextRequest) {
       message: "Logged out successfully",
     })
 
-    // Clear the auth token cookie
+    // Clear the access token cookie
     apiResponse.cookies.set({
-      name: "auth_token",
+      name: "access_token",
       value: "",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // Changed from strict to lax to allow cross-site requests
+      sameSite: "lax",
       maxAge: 0, // Expire immediately
       path: "/",
-      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined, // Use root domain in production
+      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined,
+    })
+
+    // Clear the refresh token cookie
+    apiResponse.cookies.set({
+      name: "refresh_token",
+      value: "",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0, // Expire immediately
+      path: "/",
+      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined,
     })
 
     return apiResponse
