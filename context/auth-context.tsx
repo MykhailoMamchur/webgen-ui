@@ -4,7 +4,7 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
-import { loginUser, registerUser, logoutUser, resetPassword, getCurrentUser, refreshToken } from "@/lib/auth"
+import { loginUser, registerUser, logoutUser, resetPassword, refreshToken } from "@/lib/auth"
 
 // Update the User interface to match the API response
 export interface User {
@@ -41,8 +41,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         setIsLoading(true)
 
-        // Try to get current user with the token
-        const userData = await getCurrentUser()
+        // Try to get current user with the token using our local API route
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include", // Include cookies in the request
+        })
+
+        if (!response.ok) {
+          throw new Error("Authentication failed")
+        }
+
+        const userData = await response.json()
         setUser(userData)
 
         // Set up token refresh

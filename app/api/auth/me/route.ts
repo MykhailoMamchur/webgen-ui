@@ -1,0 +1,40 @@
+// Add a new route handler for /api/auth/me
+import { type NextRequest, NextResponse } from "next/server"
+
+export async function GET(request: NextRequest) {
+  try {
+    // Get the access token from the request cookies
+    const accessToken = request.cookies.get("access_token")?.value
+
+    if (!accessToken) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    // Forward the request to the API endpoint
+    const response = await fetch("https://wegenweb.com/api/auth/me", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    // If the response is not ok, throw an error
+    if (!response.ok) {
+      const errorData = await response.json()
+      return NextResponse.json(
+        { error: errorData.message || errorData.detail || `Failed to get user data: ${response.status}` },
+        { status: response.status },
+      )
+    }
+
+    // Parse the response data
+    const data = await response.json()
+
+    // Return the user data
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error("Error in auth/me API route:", error)
+    return NextResponse.json({ error: `Failed to get user data: ${(error as Error).message}` }, { status: 500 })
+  }
+}

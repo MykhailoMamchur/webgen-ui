@@ -30,12 +30,12 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
+    credentials: "include", // Include cookies in cross-origin requests
   }
 
   const response = await fetch(url, {
     ...options,
     headers,
-    credentials: "include", // Include cookies in cross-origin requests
   })
 
   // Handle non-JSON responses
@@ -123,15 +123,62 @@ export async function logoutUser() {
 
 // Reset password
 export async function resetPassword(email: string) {
-  return authFetch("/auth/reset-password", {
+  const response = await fetch("/api/auth/reset-password", {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ email }),
+    credentials: "include", // Include cookies in the request
   })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || errorData.message || "Failed to reset password")
+  }
+
+  return await response.json()
 }
 
 // Get current user
 export async function getCurrentUser() {
-  return authFetch("/auth/me")
+  // Get the auth token directly
+  const token = getAuthToken()
+
+  if (!token) {
+    throw new Error("Authentication required")
+  }
+
+  const url = `${API_BASE_URL}/auth/me`
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include", // Include cookies in cross-origin requests
+  })
+
+  // Handle non-JSON responses
+  const contentType = response.headers.get("content-type")
+  if (contentType && contentType.includes("application/json")) {
+    const data = await response.json()
+
+    // If the response is not ok, throw an error with the response data
+    if (!response.ok) {
+      throw new Error(data.message || data.detail || "An error occurred")
+    }
+
+    return data
+  }
+
+  // For non-JSON responses
+  if (!response.ok) {
+    throw new Error("An error occurred")
+  }
+
+  return response
 }
 
 // Refresh token
@@ -155,7 +202,17 @@ export async function refreshToken() {
 
 // Verify email
 export async function verifyEmail(token: string) {
-  return authFetch(`/auth/verify-email?token=${token}`)
+  const response = await fetch(`/api/auth/verify-email?token=${token}`, {
+    method: "GET",
+    credentials: "include", // Include cookies in the request
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || errorData.message || "Failed to verify email")
+  }
+
+  return await response.json()
 }
 
 // Update user profile
@@ -165,8 +222,19 @@ export async function updateUserProfile(userData: {
   currentPassword?: string
   newPassword?: string
 }) {
-  return authFetch("/auth/update-profile", {
+  const response = await fetch("/api/auth/update-profile", {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(userData),
+    credentials: "include", // Include cookies in the request
   })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || errorData.message || "Failed to update profile")
+  }
+
+  return await response.json()
 }
