@@ -4,6 +4,7 @@ import { Sparkles, ExternalLink, Upload } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import ProjectSelector from "@/components/project-selector"
+import { AuthNav } from "@/components/auth-nav"
 import type { ProjectSummary } from "@/types/project"
 
 interface HeaderProps {
@@ -135,6 +136,8 @@ export default function Header({
       </div>
 
       <div className="ml-auto flex items-center gap-3">
+        <AuthNav />
+
         <Button
           variant="outline"
           size="sm"
