@@ -143,8 +143,13 @@ export async function resetPassword(email: string) {
 // Get current user
 export async function getCurrentUser() {
   // Use our local API route instead of direct fetch
+  const token = getAuthToken()
   const response = await fetch("/api/auth/me", {
     method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     credentials: "include", // Include cookies in the request
   })
 
