@@ -28,14 +28,14 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
 
   const headers = {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}), // Ensure Authorization header is properly formatted
     ...options.headers,
-    credentials: "include", // Include cookies in cross-origin requests
   }
 
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: "include", // Include cookies in cross-origin requests
   })
 
   // Handle non-JSON responses
@@ -142,43 +142,18 @@ export async function resetPassword(email: string) {
 
 // Get current user
 export async function getCurrentUser() {
-  // Get the auth token directly
-  const token = getAuthToken()
-
-  if (!token) {
-    throw new Error("Authentication required")
-  }
-
-  const url = `${API_BASE_URL}/auth/me`
-
-  const response = await fetch(url, {
+  // Use our local API route instead of direct fetch
+  const response = await fetch("/api/auth/me", {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    credentials: "include", // Include cookies in cross-origin requests
+    credentials: "include", // Include cookies in the request
   })
 
-  // Handle non-JSON responses
-  const contentType = response.headers.get("content-type")
-  if (contentType && contentType.includes("application/json")) {
-    const data = await response.json()
-
-    // If the response is not ok, throw an error with the response data
-    if (!response.ok) {
-      throw new Error(data.message || data.detail || "An error occurred")
-    }
-
-    return data
-  }
-
-  // For non-JSON responses
   if (!response.ok) {
-    throw new Error("An error occurred")
+    const errorData = await response.json()
+    throw new Error(errorData.error || errorData.message || "Authentication failed")
   }
 
-  return response
+  return await response.json()
 }
 
 // Refresh token

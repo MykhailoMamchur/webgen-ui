@@ -41,6 +41,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         setIsLoading(true)
 
+        // Skip authentication check for public routes
+        if (
+          pathname === "/signup" ||
+          pathname === "/login" ||
+          pathname === "/reset-password" ||
+          pathname === "/verify-email"
+        ) {
+          setUser(null)
+          setIsLoading(false)
+          return
+        }
+
         // Try to get current user with the token using our local API route
         const response = await fetch("/api/auth/me", {
           method: "GET",

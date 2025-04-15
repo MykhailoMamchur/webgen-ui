@@ -10,22 +10,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    // Forward the request to the API endpoint
+    // Forward the request to the API endpoint with explicit Authorization header
     const response = await fetch("https://wegenweb.com/api/auth/me", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`, // Explicitly set the Authorization header
       },
     })
 
-    // If the response is not ok, throw an error
+    // If the response is not ok, return a more specific error
     if (!response.ok) {
-      const errorData = await response.json()
-      return NextResponse.json(
-        { error: errorData.message || errorData.detail || `Failed to get user data: ${response.status}` },
-        { status: response.status },
-      )
+      // Try to parse the error response
+      try {
+        const errorData = await response.json()
+        return NextResponse.json(
+          { error: errorData.message || errorData.detail || `Failed to get user data: ${response.status}` },
+          { status: response.status },
+        )
+      } catch (e) {
+        // If we can't parse the response as JSON, return a generic error
+        return NextResponse.json({ error: `Failed to get user data: ${response.status}` }, { status: response.status })
+      }
     }
 
     // Parse the response data

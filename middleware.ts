@@ -14,15 +14,17 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value
   const isAuthenticated = !!token
 
-  // Redirect logic
-  if (!isAuthenticated && !isPublicPath) {
-    // Redirect to signup if not authenticated and trying to access a protected route
-    return NextResponse.redirect(new URL("/signup", request.url))
-  }
-
+  // Only redirect authenticated users away from public routes
+  // Don't redirect unauthenticated users to login/signup if they're already going there
   if (isAuthenticated && isPublicPath) {
     // Redirect to home if authenticated and trying to access a public route
     return NextResponse.redirect(new URL("/", request.url))
+  }
+
+  // For protected routes, check authentication
+  if (!isAuthenticated && !isPublicPath) {
+    // Redirect to signup if not authenticated and trying to access a protected route
+    return NextResponse.redirect(new URL("/signup", request.url))
   }
 
   return NextResponse.next()
