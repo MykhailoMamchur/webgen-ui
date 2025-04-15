@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), // Ensure proper format
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), // Ensure proper format with space
       },
       // Make sure we're explicitly passing all properties in the request body
       body: JSON.stringify({

@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), // JWT token with HS256 algorithm
       },
       body: JSON.stringify({
         refresh_token: refreshToken,

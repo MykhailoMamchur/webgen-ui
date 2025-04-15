@@ -28,7 +28,7 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
 
   const headers = {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}), // Ensure Authorization header is properly formatted
+    ...(token ? { Authorization: `Bearer ${token}` } : {}), // JWT token with HS256 algorithm using Bearer scheme
     ...options.headers,
   }
 

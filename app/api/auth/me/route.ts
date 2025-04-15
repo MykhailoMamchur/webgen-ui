@@ -11,11 +11,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Forward the request to the API endpoint with explicit Authorization header
+    // Using JWT with HS256 algorithm in the Authorization header
     const response = await fetch("https://wegenweb.com/api/auth/me", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`, // Explicitly set the Authorization header
+        Authorization: `Bearer ${accessToken}`, // JWT token with HS256 algorithm
       },
     })
 
