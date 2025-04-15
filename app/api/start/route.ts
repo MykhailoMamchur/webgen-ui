@@ -5,6 +5,9 @@ export async function POST(request: NextRequest) {
     // Get the request body
     const body = await request.json()
 
+    // Get the access token from the request cookies
+    const accessToken = request.cookies.get("access_token")?.value
+
     // Ensure project_name is used consistently
     const requestBody = {
       project_name: body.project_name || body.directory, // Support both formats
@@ -20,6 +23,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify(requestBody),
     })

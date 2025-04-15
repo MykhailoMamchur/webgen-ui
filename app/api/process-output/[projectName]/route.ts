@@ -4,6 +4,9 @@ export async function GET(request: NextRequest, { params }: { params: { projectN
   try {
     const projectName = params.projectName
 
+    // Get the access token from the request cookies
+    const accessToken = request.cookies.get("access_token")?.value
+
     if (!projectName) {
       return NextResponse.json({ error: "Project name is required" }, { status: 400 })
     }
@@ -13,6 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: { projectN
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
     })
 

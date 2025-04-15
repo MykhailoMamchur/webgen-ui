@@ -2,11 +2,15 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
+    // Get the access token from the request cookies
+    const accessToken = request.cookies.get("access_token")?.value
+
     // Forward the request to the new API endpoint
     const response = await fetch("https://wegenweb.com/api/stop-all", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
     })
 

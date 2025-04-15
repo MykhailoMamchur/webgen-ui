@@ -6,6 +6,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { project_name } = body
 
+    // Get the access token from the request cookies
+    const accessToken = request.cookies.get("access_token")?.value
+
     // Validate the project name
     if (!project_name) {
       return NextResponse.json({ error: "Project name is required" }, { status: 400 })
@@ -18,6 +21,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify({ project_name }),
     })
