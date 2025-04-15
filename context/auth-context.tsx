@@ -4,7 +4,7 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
-import { loginUser, registerUser, logoutUser, resetPassword, getCurrentUser, refreshToken } from "@/lib/auth"
+import { loginUser, registerUser, logoutUser, resetPassword, getCurrentUser } from "@/lib/auth"
 
 export interface User {
   id: string
@@ -40,32 +40,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         setIsLoading(true)
 
-        // Check if we have a token in localStorage
-        const token = localStorage.getItem("auth_token")
-
-        if (!token) {
-          setUser(null)
-          setIsLoading(false)
-          return
-        }
-
         // Try to get current user with the token
         const userData = await getCurrentUser()
         setUser(userData)
 
         // Set up token refresh
-        setupTokenRefresh()
+        const refreshIntervalId = setupTokenRefresh()
+
+        return () => {
+          if (refreshIntervalId) clearInterval(refreshIntervalId)
+        }
       } catch (error) {
         console.error("Authentication error:", error)
         setUser(null)
         localStorage.removeItem("auth_token")
+
+        // Redirect to signup page if not on an auth page
+        if (
+          pathname !== "/signup" &&
+          pathname !== "/login" &&
+          pathname !== "/reset-password" &&
+          pathname !== "/verify-email"
+        ) {
+          router.push("/signup")
+        }
       } finally {
         setIsLoading(false)
       }
     }
 
     checkAuth()
-  }, [])
+  }, [pathname, router])
 
   // Set up token refresh interval
   const setupTokenRefresh = () => {
@@ -73,7 +78,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const refreshInterval = setInterval(
       async () => {
         try {
-          await refreshToken()
+          // Use our API route for token refresh
+          const response = await fetch("/api/auth/refresh", {
+            method: "POST",
+            credentials: "include", // Include cookies in the request
+          })
+
+          if (!response.ok) {
+            throw new Error("Token refresh failed")
+          }
+
+          const data = await response.json()
+
+          // Update localStorage if needed
+          if (data.token) {
+            localStorage.setItem("auth_token", data.token)
+          }
         } catch (error) {
           console.error("Token refresh failed:", error)
           // If refresh fails, log the user out
@@ -84,8 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       25 * 60 * 1000, // 25 minutes
     )
 
-    // Clean up interval on unmount
-    return () => clearInterval(refreshInterval)
+    return refreshInterval
   }
 
   // Login function
@@ -137,6 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update user state
       setUser(userData)
 
+      // Set up token refresh
+      setupTokenRefresh()
+
       // Show success toast
       toast({
         title: "Registration successful",
@@ -144,8 +166,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         variant: "success",
       })
 
-      // Redirect to email verification page
-      router.push("/verify-email")
+      // Redirect to home page instead of verification page
+      router.push("/")
     } catch (error: any) {
       console.error("Signup error:", error)
       toast({

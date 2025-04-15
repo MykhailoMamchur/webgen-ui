@@ -2,31 +2,27 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the request body
-    const body = await request.json()
+    // Get the auth token from the request cookies
+    const token = request.cookies.get("auth_token")?.value
 
-    // Ensure email and password are provided
-    if (!body.email || !body.password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
+    if (!token) {
+      return NextResponse.json({ error: "No authentication token found" }, { status: 401 })
     }
 
     // Forward the request to the API endpoint
-    const response = await fetch("https://wegenweb.com/api/auth/login", {
+    const response = await fetch("https://wegenweb.com/api/auth/refresh", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        email: body.email,
-        password: body.password,
-      }),
     })
 
     // If the response is not ok, throw an error
     if (!response.ok) {
       const errorData = await response.json()
       return NextResponse.json(
-        { error: errorData.message || errorData.detail || `Failed to login: ${response.status}` },
+        { error: errorData.message || errorData.detail || `Failed to refresh token: ${response.status}` },
         { status: response.status },
       )
     }
@@ -36,12 +32,11 @@ export async function POST(request: NextRequest) {
 
     // Set the auth token in a cookie
     const response2 = NextResponse.json({
-      user: data.user,
       token: data.token,
-      message: "Login successful",
+      message: "Token refreshed successfully",
     })
 
-    // Set a secure HTTP-only cookie with the token
+    // Set a secure HTTP-only cookie with the new token
     // Expires in 7 days
     response2.cookies.set({
       name: "auth_token",
@@ -56,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     return response2
   } catch (error) {
-    console.error("Error in login API route:", error)
-    return NextResponse.json({ error: `Failed to login: ${(error as Error).message}` }, { status: 500 })
+    console.error("Error in refresh token API route:", error)
+    return NextResponse.json({ error: `Failed to refresh token: ${(error as Error).message}` }, { status: 500 })
   }
 }

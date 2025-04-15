@@ -26,9 +26,10 @@ export async function POST(request: NextRequest) {
       value: "",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax", // Changed from strict to lax to allow cross-site requests
       maxAge: 0, // Expire immediately
       path: "/",
+      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined, // Use root domain in production
     })
 
     return apiResponse

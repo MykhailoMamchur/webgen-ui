@@ -25,6 +25,7 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: "include", // Include cookies in cross-origin requests
   })
 
   // Handle non-JSON responses
@@ -50,33 +51,64 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
 
 // Login user
 export async function loginUser(email: string, password: string) {
-  const data = await authFetch("/auth/login", {
+  // Use the local API route which will set the cookie properly
+  const response = await fetch("/api/auth/login", {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ email, password }),
+    credentials: "include", // Include cookies in the request
   })
 
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || errorData.message || "Login failed")
+  }
+
+  const data = await response.json()
   return data
 }
 
 // Register user - Updated to match backend expectations
 export async function registerUser(email: string, password: string, passwordConfirm: string) {
-  const data = await authFetch("/auth/signup", {
+  // Use the local API route which will set the cookie properly
+  const response = await fetch("/api/auth/signup", {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       email,
       password,
       password_confirm: passwordConfirm,
     }),
+    credentials: "include", // Include cookies in the request
   })
 
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || errorData.message || "Registration failed")
+  }
+
+  const data = await response.json()
   return data
 }
 
 // Logout user
 export async function logoutUser() {
-  return authFetch("/auth/logout", {
+  // Use the local API route which will clear the cookie properly
+  const response = await fetch("/api/auth/logout", {
     method: "POST",
+    credentials: "include", // Include cookies in the request
   })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || errorData.message || "Logout failed")
+  }
+
+  return await response.json()
 }
 
 // Reset password
@@ -94,14 +126,21 @@ export async function getCurrentUser() {
 
 // Refresh token
 export async function refreshToken() {
-  const data = await authFetch("/auth/refresh")
+  try {
+    const data = await authFetch("/auth/refresh")
 
-  // Update token in localStorage if a new one is returned
-  if (data.token) {
-    localStorage.setItem("auth_token", data.token)
+    // Update token in localStorage if a new one is returned
+    if (data.token) {
+      localStorage.setItem("auth_token", data.token)
+    }
+
+    return data
+  } catch (error) {
+    console.error("Failed to refresh token:", error)
+    // Clear token from localStorage on refresh failure
+    localStorage.removeItem("auth_token")
+    throw error
   }
-
-  return data
 }
 
 // Verify email

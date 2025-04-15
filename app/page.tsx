@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Header from "@/components/header"
 import ChatSidebar from "@/components/chat-sidebar"
 import WebsitePreview from "@/components/website-preview"
-import WelcomeScreen from "@/components/welcome-screen"
 import NewProjectModal from "@/components/new-project-modal"
 import { Tabs } from "@/components/tabs"
 import GenerationCodeView from "@/components/generation-code-view"
@@ -12,6 +12,7 @@ import ProjectFilesTab from "@/components/project-files-tab"
 import type { Project, ProjectSummary } from "@/types/project"
 import { v4 as uuidv4 } from "uuid"
 import DeploymentModal from "@/components/deployment-modal"
+import { useAuth } from "@/context/auth-context"
 
 // Update the DEFAULT_HTML to be empty
 const DEFAULT_HTML = ``
@@ -195,10 +196,12 @@ interface ImageData {
 
 // Update the Home component to handle selected elements
 export default function Home() {
+  const router = useRouter()
+  const { isAuthenticated, isLoading } = useAuth()
+
   // Add state for selected elements
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([])
 
-  const [showWelcome, setShowWelcome] = useState(false) // Show welcome screen by default
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("generation")
   const [isExiting, setIsExiting] = useState(false)
@@ -222,6 +225,13 @@ export default function Home() {
   const codeContent = currentProject?.codeContent || DEFAULT_HTML
   const projectName = currentProject?.name || ""
 
+  // Redirect to signup if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/signup")
+    }
+  }, [isAuthenticated, isLoading, router])
+
   // Function to save a message to the server
   const saveMessageToServer = async (projectName: string, message: { role: "user" | "assistant"; content: string }) => {
     try {
@@ -237,6 +247,7 @@ export default function Home() {
             content: message.content,
           },
         }),
+        credentials: "include", // Include cookies in the request
       })
 
       if (!response.ok) {
@@ -258,6 +269,7 @@ export default function Home() {
         body: JSON.stringify({
           project_name: projectName,
         }),
+        credentials: "include", // Include cookies in the request
       })
 
       if (!response.ok) {
@@ -288,6 +300,7 @@ export default function Home() {
         body: JSON.stringify({
           project_name: projectName,
         }),
+        credentials: "include", // Include cookies in the request
       })
 
       if (!response.ok) {
@@ -314,46 +327,44 @@ export default function Home() {
 
   // Update the useEffect to load projects from the API
   useEffect(() => {
+    // Only fetch projects if authenticated
+    if (!isAuthenticated || isLoading) return
+
     // First try to load projects from the API
     const fetchProjects = async () => {
       try {
-        const response = await fetch("/api/projects")
-        if (response.ok) {
-          const data = await response.json()
+        const response = await fetch("/api/projects", {
+          credentials: "include", // Include cookies in the request
+        })
 
-          // Check if user is authenticated
-          if (!data.authenticated) {
-            // If not authenticated, show the welcome screen
-            setShowWelcome(false)
-            return
-          }
-
-          if (data.projects && Array.isArray(data.projects)) {
-            // Convert project data to Project objects
-            const projectsFromAPI = data.projects.map((project: any) => ({
-              id: uuidv4(),
-              name: project.name,
-              description: `Project ${project.name}`,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              directory: project.name, // Keep original casing
-              websiteContent: DEFAULT_HTML,
-              codeContent: DEFAULT_HTML,
-              messages: [],
-              status: project.status,
-              port: project.port,
-            }))
-
-            setProjects(projectsFromAPI)
-
-            // Don't set any project as current at startup
-            // Let the user select or create a new one
-            return
-          }
+        if (!response.ok) {
+          throw new Error(`Failed to fetch projects: ${response.status}`)
         }
 
-        // If API fails, fall back to localStorage
-        loadProjectsFromLocalStorage()
+        const data = await response.json()
+
+        if (data.projects && Array.isArray(data.projects)) {
+          // Convert project data to Project objects
+          const projectsFromAPI = data.projects.map((project: any) => ({
+            id: uuidv4(),
+            name: project.name,
+            description: `Project ${project.name}`,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            directory: project.name, // Keep original casing
+            websiteContent: DEFAULT_HTML,
+            codeContent: DEFAULT_HTML,
+            messages: [],
+            status: project.status,
+            port: project.port,
+          }))
+
+          setProjects(projectsFromAPI)
+
+          // Don't set any project as current at startup
+          // Let the user select or create a new one
+          return
+        }
       } catch (error) {
         console.error("Error fetching projects:", error)
         // Fall back to localStorage
@@ -379,14 +390,11 @@ export default function Home() {
         } catch (error) {
           console.error("Error loading projects from localStorage:", error)
         }
-      } else {
-        // If no projects in localStorage and API failed, show welcome screen
-        setShowWelcome(true)
       }
     }
 
     fetchProjects()
-  }, [])
+  }, [isAuthenticated, isLoading])
 
   // Save projects to localStorage whenever they change
   useEffect(() => {
@@ -394,19 +402,6 @@ export default function Home() {
       localStorage.setItem("manufactura_projects", JSON.stringify(projects))
     }
   }, [projects])
-
-  // Prevent scrolling when welcome screen is shown
-  useEffect(() => {
-    if (showWelcome) {
-      document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = "auto"
-    }
-
-    return () => {
-      document.body.style.overflow = "auto"
-    }
-  }, [showWelcome])
 
   // Add this function to handle aborting generation
   const abortGeneration = () => {
@@ -483,6 +478,7 @@ export default function Home() {
         body: JSON.stringify({
           project_name: projectToDelete.directory,
         }),
+        credentials: "include", // Include cookies in the request
       })
 
       if (!response.ok) {
@@ -545,6 +541,7 @@ export default function Home() {
           project_name: projectToRename.directory,
           new_project_name: formattedNewName,
         }),
+        credentials: "include", // Include cookies in the request
       })
 
       if (!response.ok) {
@@ -588,8 +585,6 @@ export default function Home() {
     }
 
     setTimeout(async () => {
-      setShowWelcome(false)
-
       if (!currentProject) return
 
       // Fetch the latest messages before adding the user message
@@ -751,6 +746,7 @@ export default function Home() {
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,
+        credentials: "include", // Include cookies in the request
       })
 
       if (!response.ok) {
@@ -1077,6 +1073,7 @@ export default function Home() {
           project_name: currentProject.directory,
           commit_hash: hash,
         }),
+        credentials: "include", // Include cookies in the request
       })
 
       if (!response.ok) {
@@ -1120,6 +1117,15 @@ export default function Home() {
       // Clear loading state
       setRestoringCheckpoint(null)
     }
+  }
+
+  // If still loading or not authenticated, show a loading state
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#0A090F]">
+        <div className="text-white">Loading...</div>
+      </div>
+    )
   }
 
   // Fix the width issues by adding a min-width to the main content area
@@ -1178,12 +1184,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      {showWelcome && (
-        <div className={isExiting ? "welcome-overlay-exit welcome-overlay-exit-active" : ""}>
-          <WelcomeScreen onStart={handleStart} />
-        </div>
-      )}
 
       <NewProjectModal
         isOpen={isNewProjectModalOpen}
