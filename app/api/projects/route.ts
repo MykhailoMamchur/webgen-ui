@@ -2,11 +2,20 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
-    // Update the API endpoint to use wegenweb.com/api
+    // Get the auth token from the request cookies
+    const token = request.cookies.get("auth_token")?.value
+
+    // If no token, return an empty projects array instead of an error
+    if (!token) {
+      return NextResponse.json({ projects: [], authenticated: false })
+    }
+
+    // Update the API endpoint to use wegenweb.com/api with authentication
     const response = await fetch("https://wegenweb.com/api/projects", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
     })
 
@@ -18,12 +27,13 @@ export async function GET(request: NextRequest) {
 
     // Return the response directly
     const data = await response.json()
-    return NextResponse.json(data)
+    return NextResponse.json({ ...data, authenticated: true })
   } catch (error) {
     console.error("Error in projects API route:", error)
+    // Return empty projects array instead of error status
     return NextResponse.json(
-      { error: `Failed to fetch projects: ${(error as Error).message}`, projects: [] },
-      { status: 500 },
+      { error: `Failed to fetch projects: ${(error as Error).message}`, projects: [], authenticated: false },
+      { status: 200 }, // Return 200 instead of 500 to handle gracefully
     )
   }
 }

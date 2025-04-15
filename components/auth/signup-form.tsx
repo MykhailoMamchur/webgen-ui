@@ -14,7 +14,6 @@ import { Loader2 } from "lucide-react"
 // Form validation schema
 const signupSchema = z
   .object({
-    name: z.string().min(2, { message: "Name must be at least 2 characters" }),
     email: z.string().email({ message: "Please enter a valid email address" }),
     password: z
       .string()
@@ -39,7 +38,6 @@ export function SignupForm() {
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      name: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -50,7 +48,7 @@ export function SignupForm() {
   const onSubmit = async (values: SignupFormValues) => {
     try {
       setIsLoading(true)
-      await signup(values.email, values.password, values.name)
+      await signup(values.email, values.password, values.confirmPassword)
     } catch (error: any) {
       // Error is handled in the auth context, but we can add specific handling here if needed
       console.error("Signup error:", error)
@@ -69,20 +67,6 @@ export function SignupForm() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input placeholder="John Doe" autoComplete="name" disabled={isLoading} {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           <FormField
             control={form.control}
             name="email"

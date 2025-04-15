@@ -34,7 +34,7 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
 
     // If the response is not ok, throw an error with the response data
     if (!response.ok) {
-      throw new Error(data.message || "An error occurred")
+      throw new Error(data.message || data.detail || "An error occurred")
     }
 
     return data
@@ -58,11 +58,15 @@ export async function loginUser(email: string, password: string) {
   return data
 }
 
-// Register user
-export async function registerUser(email: string, password: string, name?: string) {
+// Register user - Updated to match backend expectations
+export async function registerUser(email: string, password: string, passwordConfirm: string) {
   const data = await authFetch("/auth/signup", {
     method: "POST",
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify({
+      email,
+      password,
+      password_confirm: passwordConfirm,
+    }),
   })
 
   return data

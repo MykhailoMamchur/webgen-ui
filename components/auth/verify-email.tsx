@@ -1,13 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { verifyEmail } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Loader2, CheckCircle, XCircle, ArrowLeft } from "lucide-react"
 
-export function VerifyEmail() {
+// Create a separate component that uses useSearchParams
+function VerifyEmailContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
 
@@ -114,4 +115,24 @@ export function VerifyEmail() {
   }
 
   return null
+}
+
+// Main component with Suspense boundary
+export function VerifyEmail() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto w-full max-w-md space-y-6">
+          <div className="space-y-2 text-center">
+            <h1 className="text-3xl font-bold">Loading...</h1>
+            <div className="flex justify-center mt-6">
+              <Loader2 className="h-12 w-12 animate-spin text-purple-500" />
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <VerifyEmailContent />
+    </Suspense>
+  )
 }

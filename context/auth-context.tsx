@@ -20,7 +20,7 @@ interface AuthContextType {
   isLoading: boolean
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
-  signup: (email: string, password: string, name?: string) => Promise<void>
+  signup: (email: string, password: string, passwordConfirm: string) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateUser: (user: Partial<User>) => void
@@ -125,11 +125,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Signup function
-  const handleSignup = async (email: string, password: string, name?: string) => {
+  // Signup function - Updated to match backend expectations
+  const handleSignup = async (email: string, password: string, passwordConfirm: string) => {
     try {
       setIsLoading(true)
-      const { user: userData, token } = await registerUser(email, password, name)
+      const { user: userData, token } = await registerUser(email, password, passwordConfirm)
 
       // Save token to localStorage
       localStorage.setItem("auth_token", token)

@@ -320,6 +320,14 @@ export default function Home() {
         const response = await fetch("/api/projects")
         if (response.ok) {
           const data = await response.json()
+
+          // Check if user is authenticated
+          if (!data.authenticated) {
+            // If not authenticated, show the welcome screen
+            setShowWelcome(false)
+            return
+          }
+
           if (data.projects && Array.isArray(data.projects)) {
             // Convert project data to Project objects
             const projectsFromAPI = data.projects.map((project: any) => ({
@@ -371,6 +379,9 @@ export default function Home() {
         } catch (error) {
           console.error("Error loading projects from localStorage:", error)
         }
+      } else {
+        // If no projects in localStorage and API failed, show welcome screen
+        setShowWelcome(true)
       }
     }
 
