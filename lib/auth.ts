@@ -21,23 +21,106 @@ export const getAuthToken = (): string | null => {
   return null
 }
 
-// Helper function to make authenticated API requests
+// Helper function to check if a JWT token is expired
+export const isTokenExpired = (token: string): boolean => {
+  if (!token) return true
+
+  try {
+    // Extract the payload from the JWT token
+    const base64Url = token.split(".")[1]
+    if (!base64Url) return true
+
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    )
+
+    const { exp } = JSON.parse(jsonPayload)
+
+    // Check if the token is expired
+    if (!exp) return false
+    const currentTime = Math.floor(Date.now() / 1000)
+    return currentTime >= exp
+  } catch (error) {
+    console.error("Error checking token expiration:", error)
+    return true // If we can't parse the token, assume it's expired
+  }
+}
+
+// Helper function to make authenticated API requests with token refresh
 export async function authFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
-  const token = getAuthToken()
+  let token = getAuthToken()
   const url = `${API_BASE_URL}${endpoint}`
+
+  // Check if token is expired and try to refresh it
+  if (token && isTokenExpired(token)) {
+    try {
+      await refreshToken()
+      // Get the new token after refresh
+      token = getAuthToken()
+    } catch (error) {
+      console.error("Failed to refresh token:", error)
+      // If refresh fails, clear the token and throw an error
+      throw new Error("Authentication expired. Please log in again.")
+    }
+  }
 
   const headers = {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}), // JWT token with HS256 algorithm using Bearer scheme
+    ...(token ? { Authorization: `Bearer ${token}` } : {}), // Ensure proper Bearer format with space
     ...options.headers,
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    credentials: "include", // Include cookies in cross-origin requests
-  })
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      credentials: "include", // Include cookies in cross-origin requests
+    })
 
+    // Handle 401 Unauthorized - try to refresh token and retry
+    if (response.status === 401) {
+      try {
+        await refreshToken()
+        // Get the new token after refresh
+        const newToken = getAuthToken()
+
+        // If token refresh was successful, retry the request
+        if (newToken) {
+          const newHeaders = {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${newToken}`,
+            ...options.headers,
+          }
+
+          const retryResponse = await fetch(url, {
+            ...options,
+            headers: newHeaders,
+            credentials: "include",
+          })
+
+          // Handle the retry response
+          return handleResponse(retryResponse)
+        }
+      } catch (refreshError) {
+        console.error("Token refresh failed:", refreshError)
+        throw new Error("Authentication expired. Please log in again.")
+      }
+    }
+
+    // Handle normal response
+    return handleResponse(response)
+  } catch (error) {
+    console.error("API request failed:", error)
+    throw error
+  }
+}
+
+// Helper function to handle API responses
+async function handleResponse(response: Response) {
   // Handle non-JSON responses
   const contentType = response.headers.get("content-type")
   if (contentType && contentType.includes("application/json")) {

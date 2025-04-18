@@ -4,7 +4,15 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
-import { loginUser, registerUser, logoutUser, resetPassword, refreshToken } from "@/lib/auth"
+import {
+  loginUser,
+  registerUser,
+  logoutUser,
+  resetPassword,
+  refreshToken,
+  isTokenExpired,
+  getAuthToken,
+} from "@/lib/auth"
 
 // Update the User interface to match the API response
 export interface User {
@@ -25,6 +33,7 @@ interface AuthContextType {
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateUser: (user: Partial<User>) => void
+  refreshUserToken: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -34,6 +43,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const router = useRouter()
   const pathname = usePathname()
+
+  // Function to refresh the token
+  const refreshUserToken = async (): Promise<boolean> => {
+    try {
+      await refreshToken()
+      return true
+    } catch (error) {
+      console.error("Token refresh failed:", error)
+      return false
+    }
+  }
 
   // Check if user is authenticated on initial load
   useEffect(() => {
@@ -53,6 +73,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
+        // Check if token exists and is expired
+        const token = getAuthToken()
+        if (token && isTokenExpired(token)) {
+          // Try to refresh the token
+          const refreshed = await refreshUserToken()
+          if (!refreshed) {
+            // If refresh fails, redirect to login
+            setUser(null)
+            router.push("/login")
+            setIsLoading(false)
+            return
+          }
+        }
+
         // Try to get current user with the token using our local API route
         const response = await fetch("/api/auth/me", {
           method: "GET",
@@ -60,6 +94,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
 
         if (!response.ok) {
+          // If 401 Unauthorized, try to refresh the token
+          if (response.status === 401) {
+            const refreshed = await refreshUserToken()
+            if (refreshed) {
+              // If refresh succeeds, try to get user data again
+              const retryResponse = await fetch("/api/auth/me", {
+                method: "GET",
+                credentials: "include",
+              })
+
+              if (retryResponse.ok) {
+                const userData = await retryResponse.json()
+                setUser(userData)
+                setupTokenRefresh()
+                setIsLoading(false)
+                return
+              }
+            }
+
+            // If refresh fails or retry fails, redirect to login
+            setUser(null)
+            router.push("/login")
+            setIsLoading(false)
+            return
+          }
+
           throw new Error("Authentication failed")
         }
 
@@ -67,15 +127,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(userData)
 
         // Set up token refresh
-        const refreshIntervalId = setupTokenRefresh()
-
-        return () => {
-          if (refreshIntervalId) clearInterval(refreshIntervalId)
-        }
+        setupTokenRefresh()
       } catch (error) {
         console.error("Authentication error:", error)
         setUser(null)
-        localStorage.removeItem("auth_token")
 
         // Redirect to signup page if not on an auth page
         if (
@@ -189,9 +244,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
       await logoutUser()
 
-      // Clear token from localStorage
-      localStorage.removeItem("auth_token")
-
       // Update user state
       setUser(null)
 
@@ -261,6 +313,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout: handleLogout,
     resetPassword: handleResetPassword,
     updateUser,
+    refreshUserToken,
   }
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
