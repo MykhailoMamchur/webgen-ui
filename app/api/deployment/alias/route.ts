@@ -2,28 +2,28 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse the request body
+    // Update the request body to use project_id instead of project_name
+    // Get the request body
     const body = await request.json()
-    const { project_name } = body
 
     // Get the access token from the request cookies
     const accessToken = request.cookies.get("access_token")?.value
 
-    // Validate the project name
-    if (!project_name) {
-      return NextResponse.json({ error: "Project name is required" }, { status: 400 })
+    // Ensure project_id is provided
+    if (!body.project_id) {
+      return NextResponse.json({ error: "Project ID is required" }, { status: 400 })
     }
 
-    // Forward the request to the external API
-    const externalApiUrl = "https://wegenweb.com/api/deployment/alias"
-
-    const response = await fetch(externalApiUrl, {
+    // Forward the request to the API endpoint
+    const response = await fetch("https://wegenweb.com/api/deployment/alias", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), // Ensure proper format with space
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
-      body: JSON.stringify({ project_name }),
+      body: JSON.stringify({
+        project_id: body.project_id,
+      }),
     })
 
     // Check if the response is successful

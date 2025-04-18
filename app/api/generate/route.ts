@@ -80,4 +80,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Failed to generate content: ${(error as Error).message}` }, { status: 500 })
   }
 }
-

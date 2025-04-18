@@ -8,14 +8,15 @@ export async function POST(request: NextRequest) {
     // Get the access token from the request cookies
     const accessToken = request.cookies.get("access_token")?.value
 
-    // Ensure project_name is used consistently
+    // Update the request body to use project_id instead of project_name
+    // Ensure project_id is used consistently
     const requestBody = {
-      project_name: body.project_name || body.directory, // Support both formats
+      project_id: body.project_id || body.project_name || body.directory, // Support all formats for backward compatibility
     }
 
-    // Ensure project_name is provided
-    if (!requestBody.project_name) {
-      return NextResponse.json({ error: "Project name is required" }, { status: 400 })
+    // Ensure project_id is provided
+    if (!requestBody.project_id) {
+      return NextResponse.json({ error: "Project ID is required" }, { status: 400 })
     }
 
     // Update the API endpoint to use wegenweb.com/api

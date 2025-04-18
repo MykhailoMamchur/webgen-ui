@@ -4,14 +4,14 @@ export async function POST(request: NextRequest) {
   try {
     // Parse the request body
     const body = await request.json()
-    const { project_name } = body
+    const { project_id } = body
 
     // Get the access token from the request cookies
     const accessToken = request.cookies.get("access_token")?.value
 
-    // Validate the project name
-    if (!project_name) {
-      return NextResponse.json({ error: "Project name is required" }, { status: 400 })
+    // Validate the project ID
+    if (!project_id) {
+      return NextResponse.json({ error: "Project ID is required" }, { status: 400 })
     }
 
     // Forward the request to the external API
@@ -23,7 +23,11 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), // Ensure proper format with space
       },
-      body: JSON.stringify({ project_name }),
+      body: JSON.stringify({
+        project_id,
+        branch: body.branch || "main",
+        target: body.target || "production",
+      }),
     })
 
     // Check if the response is successful

@@ -11,10 +11,15 @@ export async function POST(request: NextRequest) {
     // Get the access token from the request cookies
     const accessToken = request.cookies.get("access_token")?.value
 
-    // Ensure project_name is used consistently
+    // Update the request body to use project_id instead of project_name
     const requestBody = {
       ...body,
-      project_name: body.project_name || body.directory, // Support both formats
+      project_id: body.project_id || body.project_name || body.directory, // Support all formats for backward compatibility
+    }
+
+    // Remove project_name if it exists to avoid confusion
+    if (requestBody.project_name) {
+      delete requestBody.project_name
     }
 
     // Remove directory if it exists to avoid confusion

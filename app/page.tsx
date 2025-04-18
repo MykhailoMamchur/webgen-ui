@@ -10,7 +10,6 @@ import { Tabs } from "@/components/tabs"
 import GenerationCodeView from "@/components/generation-code-view"
 import ProjectFilesTab from "@/components/project-files-tab"
 import type { Project, ProjectSummary } from "@/types/project"
-import { v4 as uuidv4 } from "uuid"
 import DeploymentModal from "@/components/deployment-modal"
 import { useAuth } from "@/context/auth-context"
 
@@ -232,8 +231,9 @@ export default function Home() {
     }
   }, [isAuthenticated, isLoading, router])
 
+  // Update the function to use project_id instead of project_name/directory
   // Function to save a message to the server
-  const saveMessageToServer = async (projectName: string, message: { role: "user" | "assistant"; content: string }) => {
+  const saveMessageToServer = async (projectId: string, message: { role: "user" | "assistant"; content: string }) => {
     try {
       const response = await fetch("/api/chat/add", {
         method: "POST",
@@ -241,7 +241,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          project_name: projectName,
+          project_id: projectId,
           message: {
             role: message.role,
             content: message.content,
@@ -259,7 +259,7 @@ export default function Home() {
   }
 
   // Function to load messages from the server
-  const loadMessagesFromServer = async (projectName: string) => {
+  const loadMessagesFromServer = async (projectId: string) => {
     try {
       const response = await fetch("/api/chat/load", {
         method: "POST",
@@ -267,7 +267,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          project_name: projectName,
+          project_id: projectId,
         }),
         credentials: "include", // Include cookies in the request
       })
@@ -290,7 +290,7 @@ export default function Home() {
   }
 
   // Function to load logs from the server
-  const loadLogsFromServer = async (projectName: string) => {
+  const loadLogsFromServer = async (projectId: string) => {
     try {
       const response = await fetch("/api/logs/load", {
         method: "POST",
@@ -298,7 +298,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          project_name: projectName,
+          project_id: projectId,
         }),
         credentials: "include", // Include cookies in the request
       })
@@ -325,6 +325,7 @@ export default function Home() {
     setActiveTab(tabId)
   }
 
+  // Update the useEffect to handle the new projects response format
   // Update the useEffect to load projects from the API
   useEffect(() => {
     // Only fetch projects if authenticated
@@ -344,19 +345,19 @@ export default function Home() {
         const data = await response.json()
 
         if (data.projects && Array.isArray(data.projects)) {
-          // Convert project data to Project objects
+          // Convert project data to Project objects using the new format
           const projectsFromAPI = data.projects.map((project: any) => ({
-            id: uuidv4(),
+            id: project.id, // Use the server-provided ID
             name: project.name,
             description: `Project ${project.name}`,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            directory: project.name, // Keep original casing
+            createdAt: new Date(project.created_at),
+            updatedAt: new Date(project.created_at), // Use created_at as updatedAt for now
+            directory: project.name, // Keep name as directory for backward compatibility
             websiteContent: DEFAULT_HTML,
             codeContent: DEFAULT_HTML,
             messages: [],
-            status: project.status,
-            port: project.port,
+            // Add any other properties from the API response
+            created_timestamp: project.created_timestamp,
           }))
 
           setProjects(projectsFromAPI)
@@ -422,7 +423,7 @@ export default function Home() {
         })
 
         // Save the abort message to the server
-        saveMessageToServer(currentProject.directory, abortMessage)
+        saveMessageToServer(currentProject.id, abortMessage)
       }
     }
   }
@@ -439,30 +440,60 @@ export default function Home() {
     // Ensure the name doesn't have spaces
     const formattedName = name.trim().replace(/\s+/g, "-")
 
-    const welcomeMessage = {
-      role: "assistant" as const,
-      content: WELCOME_MESSAGE,
+    try {
+      // Call the API to create the project on the server
+      const response = await fetch("/api/projects/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          project_name: formattedName,
+        }),
+        credentials: "include", // Include cookies in the request
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to create project: ${response.status}`)
+      }
+
+      // Get the project_id from the response
+      const data = await response.json()
+      const projectId = data.project_id
+
+      const welcomeMessage = {
+        role: "assistant" as const,
+        content: WELCOME_MESSAGE,
+      }
+
+      const newProject: Project = {
+        id: projectId, // Use the server-provided ID
+        name: formattedName,
+        description,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        directory: formattedName, // Keep original casing for backward compatibility
+        websiteContent: DEFAULT_HTML,
+        codeContent: DEFAULT_HTML,
+        messages: [welcomeMessage],
+      }
+
+      setProjects((prev) => [...prev, newProject])
+      setCurrentProjectId(projectId)
+
+      // Save the welcome message to the server
+      await saveMessageToServer(projectId, welcomeMessage)
+
+      return projectId
+    } catch (error) {
+      console.error("Error creating project:", error)
+      alert(`Failed to create project: ${(error as Error).message}`)
+      throw error
     }
-
-    const newProject: Project = {
-      id: uuidv4(),
-      name: formattedName,
-      description,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      directory: formattedName, // Keep original casing
-      websiteContent: DEFAULT_HTML,
-      codeContent: DEFAULT_HTML,
-      messages: [welcomeMessage],
-    }
-
-    setProjects((prev) => [...prev, newProject])
-    setCurrentProjectId(newProject.id)
-
-    // Save the welcome message to the server
-    await saveMessageToServer(formattedName, welcomeMessage)
   }
 
+  // Update the deleteProject function to use project_id
   // Delete a project
   const deleteProject = async (projectId: string): Promise<void> => {
     const projectToDelete = projects.find((p) => p.id === projectId)
@@ -476,7 +507,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          project_name: projectToDelete.directory,
+          project_id: projectToDelete.id, // Use the project's ID from the server
         }),
         credentials: "include", // Include cookies in the request
       })
@@ -522,6 +553,7 @@ export default function Home() {
     )
   }
 
+  // Update the handleRenameProject function to use project_id
   // Add a function to handle project renaming
   const handleRenameProject = async (projectId: string, newName: string) => {
     const projectToRename = projects.find((p) => p.id === projectId)
@@ -538,7 +570,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          project_name: projectToRename.directory,
+          project_id: projectToRename.id, // Use the project's ID from the server
           new_project_name: formattedNewName,
         }),
         credentials: "include", // Include cookies in the request
@@ -556,7 +588,7 @@ export default function Home() {
             return {
               ...project,
               name: formattedNewName,
-              directory: formattedNewName,
+              directory: formattedNewName, // Update directory for backward compatibility
               updatedAt: new Date(),
             }
           }
@@ -573,23 +605,26 @@ export default function Home() {
     }
   }
 
+  // Update the handleStart function to work with the new createProject function
   const handleStart = async (prompt: string, image?: File | null) => {
     setIsExiting(true)
 
     // Create a new project if none exists
-    if (!currentProjectId) {
+    let projectId = currentProjectId
+    if (!projectId) {
       // Create a project with a random name
       const existingNames = projects.map((p) => p.name)
       const projectName = generateProjectName(existingNames)
-      await createProject(projectName, prompt.substring(0, 100))
+      projectId = await createProject(projectName, prompt.substring(0, 100))
     }
 
     setTimeout(async () => {
-      if (!currentProject) return
+      const project = projects.find((p) => p.id === projectId)
+      if (!project) return
 
       // Fetch the latest messages before adding the user message
       try {
-        const serverMessages = await loadMessagesFromServer(currentProject.directory)
+        const serverMessages = await loadMessagesFromServer(project.id)
         if (serverMessages && serverMessages.length > 0) {
           updateCurrentProject({ messages: serverMessages })
         }
@@ -615,7 +650,7 @@ export default function Home() {
       updateCurrentProject({ messages: newMessages })
 
       // Save the user message to the server
-      await saveMessageToServer(currentProject.directory, userMessage)
+      await saveMessageToServer(project.id, userMessage)
 
       // Switch to the Generation tab to show streaming content
       setActiveTab("generation")
@@ -625,7 +660,7 @@ export default function Home() {
 
       // Fetch the latest messages after generation
       try {
-        const serverMessages = await loadMessagesFromServer(currentProject.directory)
+        const serverMessages = await loadMessagesFromServer(project.id)
         if (serverMessages && serverMessages.length > 0) {
           updateCurrentProject({ messages: serverMessages })
           return // Skip adding the default assistant response if we got messages from server
@@ -635,7 +670,7 @@ export default function Home() {
       }
 
       // Add assistant response after generation is complete if no error occurred and we didn't get messages from server
-      if (!generationError && currentProject) {
+      if (!generationError && project) {
         const assistantResponse = {
           role: "assistant" as const,
           content:
@@ -647,11 +682,11 @@ export default function Home() {
         })
 
         // Save the assistant response to the server
-        await saveMessageToServer(currentProject.directory, assistantResponse)
+        await saveMessageToServer(project.id, assistantResponse)
 
         // Fetch messages one more time after saving the assistant response
         try {
-          const serverMessages = await loadMessagesFromServer(currentProject.directory)
+          const serverMessages = await loadMessagesFromServer(project.id)
           if (serverMessages && serverMessages.length > 0) {
             updateCurrentProject({ messages: serverMessages })
           }
@@ -675,6 +710,7 @@ export default function Home() {
     })
   }
 
+  // Update the generateContent function to use project_id
   // Replace the generateContent function with this version that uses /edit for both initial generation and edits
   const generateContent = async (description: string, images?: ImageData[]) => {
     if (!currentProjectId || !projectName || !currentProject) return
@@ -703,7 +739,7 @@ export default function Home() {
       // Include selected elements in the request if available
       const requestBody: any = {
         description,
-        project_name: projectName, // Use original casing
+        project_id: currentProject.id, // Use the project's ID from the server
       }
 
       // Add selected elements to the request if available
@@ -808,7 +844,7 @@ export default function Home() {
 
       // Fetch the latest messages including git messages
       try {
-        const serverMessages = await loadMessagesFromServer(currentProject.directory)
+        const serverMessages = await loadMessagesFromServer(currentProject.id)
         if (serverMessages && serverMessages.length > 0) {
           updateCurrentProject({
             messages: serverMessages,
@@ -842,11 +878,11 @@ export default function Home() {
           })
 
           // Save the error message to the server
-          await saveMessageToServer(currentProject.directory, errorResponse)
+          await saveMessageToServer(currentProject.id, errorResponse)
 
           // Fetch messages after saving the error response
           try {
-            const serverMessages = await loadMessagesFromServer(currentProject.directory)
+            const serverMessages = await loadMessagesFromServer(currentProject.id)
             if (serverMessages && serverMessages.length > 0) {
               updateCurrentProject({
                 messages: serverMessages,
@@ -873,7 +909,7 @@ export default function Home() {
 
     // Fetch the latest messages before sending a new message
     try {
-      const serverMessages = await loadMessagesFromServer(currentProject.directory)
+      const serverMessages = await loadMessagesFromServer(currentProject.id)
       if (serverMessages && serverMessages.length > 0) {
         updateCurrentProject({ messages: serverMessages })
       }
@@ -895,7 +931,7 @@ export default function Home() {
     updateCurrentProject({ messages: updatedMessages })
 
     // Save the user message to the server
-    await saveMessageToServer(currentProject.directory, userMessage)
+    await saveMessageToServer(currentProject.id, userMessage)
 
     // Generate new content based on the message and images
     await generateContent(message, images)
@@ -905,7 +941,7 @@ export default function Home() {
 
     // Fetch the latest messages after sending and generation
     try {
-      const serverMessages = await loadMessagesFromServer(currentProject.directory)
+      const serverMessages = await loadMessagesFromServer(currentProject.id)
       if (serverMessages && serverMessages.length > 0) {
         updateCurrentProject({ messages: serverMessages })
         return // Skip adding the default assistant response if we got messages from server
@@ -927,11 +963,11 @@ export default function Home() {
       })
 
       // Save the assistant response to the server
-      await saveMessageToServer(currentProject.directory, assistantResponse)
+      await saveMessageToServer(currentProject.id, assistantResponse)
 
       // Fetch messages one more time after saving the assistant response
       try {
-        const serverMessages = await loadMessagesFromServer(currentProject.directory)
+        const serverMessages = await loadMessagesFromServer(currentProject.id)
         if (serverMessages && serverMessages.length > 0) {
           updateCurrentProject({ messages: serverMessages })
         }
@@ -993,10 +1029,10 @@ export default function Home() {
     // Load both messages and logs from the server
     try {
       // Load messages
-      const serverMessages = await loadMessagesFromServer(selectedProject.directory)
+      const serverMessages = await loadMessagesFromServer(selectedProject.id)
 
       // Load logs
-      const serverLogs = await loadLogsFromServer(selectedProject.directory)
+      const serverLogs = await loadLogsFromServer(selectedProject.id)
 
       // Update project with messages and logs
       setProjects((prevProjects) =>
@@ -1030,7 +1066,7 @@ export default function Home() {
         )
 
         // Save the welcome message to the server
-        await saveMessageToServer(selectedProject.directory, welcomeMessage)
+        await saveMessageToServer(selectedProject.id, welcomeMessage)
       }
     } catch (error) {
       // Fallback to local messages or add welcome message if none exist
@@ -1048,7 +1084,7 @@ export default function Home() {
 
         // Try to save the welcome message to the server
         try {
-          await saveMessageToServer(selectedProject.directory, welcomeMessage)
+          await saveMessageToServer(selectedProject.id, welcomeMessage)
         } catch (saveError) {
           // Handle error silently
         }
@@ -1056,6 +1092,7 @@ export default function Home() {
     }
   }
 
+  // Update the handleRestoreCheckpoint function to use project_id
   // Add the handleRestoreCheckpoint function
   const handleRestoreCheckpoint = async (hash: string) => {
     if (!currentProject) return
@@ -1070,7 +1107,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          project_name: currentProject.directory,
+          project_id: currentProject.id, // Use the project's ID from the server
           commit_hash: hash,
         }),
         credentials: "include", // Include cookies in the request
@@ -1082,7 +1119,7 @@ export default function Home() {
       }
 
       // Refresh the project content
-      const serverLogs = await loadLogsFromServer(currentProject.directory)
+      const serverLogs = await loadLogsFromServer(currentProject.id)
       if (serverLogs) {
         updateCurrentProject({
           codeContent: serverLogs,
@@ -1090,7 +1127,7 @@ export default function Home() {
       }
 
       // Fetch the latest messages including the new git revert message
-      const serverMessages = await loadMessagesFromServer(currentProject.directory)
+      const serverMessages = await loadMessagesFromServer(currentProject.id)
       if (serverMessages && serverMessages.length > 0) {
         updateCurrentProject({
           messages: serverMessages,

@@ -38,17 +38,19 @@ export default function Header({
   // Add an error state to track deployment alias failures
   const [deploymentError, setDeploymentError] = useState<boolean>(false)
 
+  // Update the useEffect to use project_id
   // Check for deployment alias when the current project changes
   useEffect(() => {
-    if (currentProject?.directory && !isGenerating) {
-      getDeploymentAlias(currentProject.directory)
+    if (currentProject?.id && !isGenerating) {
+      getDeploymentAlias(currentProject.id)
     } else {
       setDeploymentAlias(null)
     }
   }, [currentProject, isGenerating])
 
+  // Update the getDeploymentAlias function to use project_id
   // Update the getDeploymentAlias function to handle errors properly
-  const getDeploymentAlias = async (directory: string) => {
+  const getDeploymentAlias = async (projectId: string) => {
     try {
       setIsLoadingAlias(true)
       setDeploymentError(false)
@@ -58,7 +60,7 @@ export default function Header({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_name: directory }),
+        body: JSON.stringify({ project_id: projectId }),
       })
 
       // Check if the response is JSON before trying to parse it
@@ -97,9 +99,10 @@ export default function Header({
   const isPreviewEnabled =
     currentProject?.directory && !isLoadingAlias && ((!isGenerating && !deploymentError) || deploymentAlias !== null)
 
+  // Update the handlePreviewClick function to use project_id
   // Handle preview button click
   const handlePreviewClick = () => {
-    if (!currentProject?.directory) return
+    if (!currentProject?.id) return
 
     if (deploymentAlias) {
       // Ensure the URL has https:// prefix
@@ -107,7 +110,7 @@ export default function Header({
       window.open(url, "_blank")
     } else {
       // If we don't have an alias yet, try to get one and then open it
-      getDeploymentAlias(currentProject.directory).then(() => {
+      getDeploymentAlias(currentProject.id).then(() => {
         if (deploymentAlias) {
           const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
           window.open(url, "_blank")

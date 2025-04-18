@@ -8,9 +8,10 @@ export async function POST(request: NextRequest) {
     // Get the access token from the request cookies
     const accessToken = request.cookies.get("access_token")?.value
 
-    // Ensure project_name and new_project_name are provided
-    if (!body.project_name) {
-      return NextResponse.json({ error: "Project name is required" }, { status: 400 })
+    // Update the request body to use project_id instead of project_name
+    // Ensure project_id and new_project_name are provided
+    if (!body.project_id) {
+      return NextResponse.json({ error: "Project ID is required" }, { status: 400 })
     }
 
     if (!body.new_project_name) {
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify({
-        project_name: body.project_name,
+        project_id: body.project_id,
         new_project_name: body.new_project_name,
       }),
     })
