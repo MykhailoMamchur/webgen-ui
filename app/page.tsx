@@ -1220,6 +1220,7 @@ export default function Home() {
               <WebsitePreview
                 content={websiteContent}
                 projectName={currentProject?.name || ""}
+                projectId={currentProject?.id || ""} // Pass projectId to WebsitePreview
                 isGenerating={isGenerating}
                 onTabActivated={() => {
                   // Only check status when preview tab is activated and NOT generating
@@ -1249,6 +1250,7 @@ export default function Home() {
           isOpen={isDeploymentModalOpen}
           onClose={() => setIsDeploymentModalOpen(false)}
           projectName={currentProject.name}
+          projectId={currentProject.id} // Pass projectId to DeploymentModal
         />
       )}
     </div>

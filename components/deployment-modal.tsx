@@ -32,8 +32,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     }
   }, [isOpen, projectId])
 
-  // Replace the getDeploymentAlias and createDeployment functions with these corrected versions:
-
+  // Update the getDeploymentAlias function to use projectId
   const getDeploymentAlias = async () => {
     try {
       setDeploymentStatus("loading")
@@ -82,7 +81,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     }
   }
 
-  // Add a function to create a deployment
+  // Update the createDeployment function to use projectId
   const createDeployment = async () => {
     try {
       setIsCreatingDeployment(true)
@@ -121,7 +120,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     }
   }
 
-  // Add a new function to check for the deployment alias after creating a deployment
+  // Update the checkDeploymentAlias function to use projectId
   const checkDeploymentAlias = async () => {
     try {
       // Wait a moment to ensure the deployment has been processed

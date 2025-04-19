@@ -44,7 +44,7 @@ export default function WebsitePreview({
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([])
   const [iframeLoaded, setIframeLoaded] = useState(false)
 
-  // Replace startServer with getDeploymentAlias
+  // Update the getDeploymentAlias function to use projectId
   const getDeploymentAlias = async () => {
     if (!projectId || isGenerating) return // Use projectId instead of projectName
 
@@ -112,7 +112,7 @@ export default function WebsitePreview({
     }
   }, [])
 
-  // Reset state when projectId changes, but don't check status during generation
+  // Update the useEffect to use projectId
   useEffect(() => {
     // Reset state when projectId changes
     setDeploymentAlias(null)
