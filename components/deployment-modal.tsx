@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 interface DeploymentModalProps {
   isOpen: boolean
   onClose: () => void
+  projectId: string
   projectName: string
 }
 
@@ -17,7 +18,7 @@ interface DeploymentAlias {
   alias: string
 }
 
-export default function DeploymentModal({ isOpen, onClose, projectName }: DeploymentModalProps) {
+export default function DeploymentModal({ isOpen, onClose, projectId, projectName }: DeploymentModalProps) {
   const [deploymentStatus, setDeploymentStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [deploymentAlias, setDeploymentAlias] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -26,10 +27,10 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
 
   // Update the useEffect to handle initial loading
   useEffect(() => {
-    if (isOpen && projectName) {
+    if (isOpen && projectId) {
       getDeploymentAlias()
     }
-  }, [isOpen, projectName])
+  }, [isOpen, projectId])
 
   // Replace the getDeploymentAlias and createDeployment functions with these corrected versions:
 
@@ -45,7 +46,7 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_id: projectName }),
+        body: JSON.stringify({ project_id: projectId }),
       })
 
       // Check if the response is JSON
@@ -93,7 +94,7 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_id: projectName }),
+        body: JSON.stringify({ project_id: projectId }),
       })
 
       // Check if the response is JSON
@@ -132,7 +133,7 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_name: projectName }),
+        body: JSON.stringify({ project_id: projectId }),
       })
 
       if (!response.ok) {

@@ -97,7 +97,7 @@ export default function Header({
 
   // Update the isPreviewEnabled condition to check for deployment errors
   const isPreviewEnabled =
-    currentProject?.directory && !isLoadingAlias && ((!isGenerating && !deploymentError) || deploymentAlias !== null)
+    currentProject?.id && !isLoadingAlias && ((!isGenerating && !deploymentError) || deploymentAlias !== null)
 
   // Update the handlePreviewClick function to use project_id
   // Handle preview button click
