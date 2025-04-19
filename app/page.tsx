@@ -443,7 +443,7 @@ export default function Home() {
     const formattedName = name.trim().replace(/\s+/g, "-")
 
     try {
-      // Call the API to create the project on the server
+      // First, make an authenticated POST request to create the project on the server
       const response = await fetch("/api/projects/create", {
         method: "POST",
         headers: {
@@ -452,7 +452,7 @@ export default function Home() {
         body: JSON.stringify({
           project_name: formattedName,
         }),
-        credentials: "include", // Include cookies in the request
+        credentials: "include", // Include cookies for authentication
       })
 
       if (!response.ok) {
@@ -464,23 +464,30 @@ export default function Home() {
       const data = await response.json()
       const projectId = data.project_id
 
+      if (!projectId) {
+        throw new Error("No project_id returned from server")
+      }
+
+      // Create welcome message
       const welcomeMessage = {
         role: "assistant" as const,
         content: WELCOME_MESSAGE,
       }
 
+      // Create the project object with the server-provided ID
       const newProject: Project = {
-        id: projectId, // Use the server-provided ID
+        id: projectId,
         name: formattedName,
         description,
         createdAt: new Date(),
         updatedAt: new Date(),
-        projectName: formattedName, // Use name as projectName
+        projectName: formattedName,
         websiteContent: DEFAULT_HTML,
         codeContent: DEFAULT_HTML,
         messages: [welcomeMessage],
       }
 
+      // Update local state
       setProjects((prev) => [...prev, newProject])
       setCurrentProjectId(projectId)
 
@@ -614,10 +621,20 @@ export default function Home() {
     // Create a new project if none exists
     let projectId = currentProjectId
     if (!projectId) {
-      // Create a project with a random name
-      const existingNames = projects.map((p) => p.name)
-      const projectName = generateProjectName(existingNames)
-      projectId = await createProject(projectName, prompt.substring(0, 100))
+      try {
+        // Create a project with a random name
+        const existingNames = projects.map((p) => p.name)
+        const projectName = generateProjectName(existingNames)
+        projectId = await createProject(projectName, prompt.substring(0, 100))
+
+        if (!projectId) {
+          throw new Error("Failed to create project: No project ID returned")
+        }
+      } catch (error) {
+        console.error("Error creating project:", error)
+        setIsExiting(false)
+        return
+      }
     }
 
     setTimeout(async () => {
@@ -696,9 +713,6 @@ export default function Home() {
           console.error("Error fetching messages after assistant response:", error)
         }
       }
-
-      // Don't switch to preview tab automatically
-      // setActiveTab("preview")
     }, 300)
   }
 
