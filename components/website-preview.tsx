@@ -7,7 +7,8 @@ import { Pointer, X } from "lucide-react"
 
 interface WebsitePreviewProps {
   content: string
-  projectName: string // Changed from directory
+  projectName: string
+  projectId: string // Added projectId prop
   isGenerating?: boolean
   onTabActivated?: () => void
   onElementsSelected?: (elements: { selector: string; html: string }[]) => void
@@ -27,7 +28,8 @@ interface DeploymentAlias {
 // Update the WebsitePreview component to include selection mode
 export default function WebsitePreview({
   content,
-  projectName, // Changed from directory
+  projectName,
+  projectId, // Added projectId parameter
   isGenerating = false,
   onTabActivated,
   onElementsSelected,
@@ -44,19 +46,19 @@ export default function WebsitePreview({
 
   // Replace startServer with getDeploymentAlias
   const getDeploymentAlias = async () => {
-    if (!projectName || isGenerating) return
+    if (!projectId || isGenerating) return // Use projectId instead of projectName
 
     try {
       setIsLoading(true)
       setError(null)
 
-      // Call the new deployment/alias API
+      // Call the new deployment/alias API with projectId
       const response = await fetch("/api/deployment/alias", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_id: projectName }),
+        body: JSON.stringify({ project_id: projectId }), // Use projectId instead of projectName
         credentials: "include", // Include cookies in the request
       })
 
@@ -104,14 +106,15 @@ export default function WebsitePreview({
     }
 
     // Get deployment alias if needed, but ONLY if not generating
-    if (projectName && !isGenerating && !deploymentAlias && !isLoading) {
+    if (projectId && !isGenerating && !deploymentAlias && !isLoading) {
+      // Use projectId instead of projectName
       getDeploymentAlias()
     }
   }, [])
 
-  // Reset state when directory changes, but don't check status during generation
+  // Reset state when projectId changes, but don't check status during generation
   useEffect(() => {
-    // Reset state when directory changes
+    // Reset state when projectId changes
     setDeploymentAlias(null)
     setError(null)
     setIframeLoaded(false)
@@ -132,20 +135,21 @@ export default function WebsitePreview({
       }
     }
 
-    // Get deployment alias for this directory, but ONLY if not generating
-    if (projectName && !isGenerating) {
+    // Get deployment alias for this projectId, but ONLY if not generating
+    if (projectId && !isGenerating) {
+      // Use projectId instead of projectName
       getDeploymentAlias()
     }
 
     // Cleanup function
     return () => {
-      // Clean up any iframe-related resources when unmounting or changing directory
+      // Clean up any iframe-related resources when unmounting or changing projectId
       if (iframeRef.current) {
         // Remove src to stop any ongoing requests
         iframeRef.current.src = "about:blank"
       }
     }
-  }, [projectName, isGenerating])
+  }, [projectId, isGenerating]) // Use projectId instead of projectName
 
   // Handle iframe content for placeholder
   useEffect(() => {
@@ -599,7 +603,7 @@ export default function WebsitePreview({
 
         {deploymentAlias ? (
           <iframe
-            key={`preview-${projectName}`}
+            key={`preview-${projectId}`} // Use projectId instead of projectName
             ref={iframeRef}
             src={deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`}
             title="Website Preview"
@@ -610,7 +614,7 @@ export default function WebsitePreview({
           />
         ) : (
           <iframe
-            key={`placeholder-${projectName}`}
+            key={`placeholder-${projectId}`} // Use projectId instead of projectName
             ref={iframeRef}
             title="Website Preview"
             className="w-full h-full border-none"
