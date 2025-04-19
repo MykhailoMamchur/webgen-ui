@@ -4,7 +4,7 @@ export interface Project {
   description: string
   createdAt: Date
   updatedAt: Date
-  directory: string
+  projectName: string // Changed from directory
   websiteContent: string
   codeContent: string
   messages: {
@@ -17,4 +17,4 @@ export interface Project {
   port?: number | null
 }
 
-export type ProjectSummary = Pick<Project, "id" | "name" | "description" | "createdAt" | "updatedAt" | "directory">
+export type ProjectSummary = Pick<Project, "id" | "name" | "description" | "createdAt" | "updatedAt" | "projectName">

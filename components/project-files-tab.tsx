@@ -4,10 +4,7 @@ import { useState, useEffect } from "react"
 import { Loader2, Folder, ChevronRight, ChevronDown, FileCode, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-interface ProjectFilesTabProps {
-  projectName: string
-}
-
+// Define the FileNode interface
 interface FileNode {
   name: string
   path: string
@@ -16,7 +13,13 @@ interface FileNode {
   children?: FileNode[]
 }
 
-export default function ProjectFilesTab({ projectName }: ProjectFilesTabProps) {
+// Update the interface to include both projectId and projectName
+interface ProjectFilesTabProps {
+  projectId: string
+  projectName: string
+}
+
+export default function ProjectFilesTab({ projectId, projectName }: ProjectFilesTabProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [instructions, setInstructions] = useState<string>("")
@@ -24,9 +27,9 @@ export default function ProjectFilesTab({ projectName }: ProjectFilesTabProps) {
   const [selectedFile, setSelectedFile] = useState<FileNode | null>(null)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
 
-  // Load instructions when the component mounts or projectName changes
+  // Load instructions when the component mounts or projectId changes
   useEffect(() => {
-    if (!projectName) return
+    if (!projectId) return
 
     const loadInstructions = async () => {
       try {
@@ -39,8 +42,9 @@ export default function ProjectFilesTab({ projectName }: ProjectFilesTabProps) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            project_name: projectName,
+            project_id: projectId,
           }),
+          credentials: "include", // Include cookies in the request
         })
 
         if (!response.ok) {
@@ -74,7 +78,7 @@ export default function ProjectFilesTab({ projectName }: ProjectFilesTabProps) {
     }
 
     loadInstructions()
-  }, [projectName])
+  }, [projectId])
 
   // Parse instructions to extract file information
   const parseInstructionsToFiles = (instructions: string): FileNode[] => {

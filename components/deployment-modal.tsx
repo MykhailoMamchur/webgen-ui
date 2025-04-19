@@ -45,7 +45,7 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_name: projectName }),
+        body: JSON.stringify({ project_id: projectName }),
       })
 
       // Check if the response is JSON
@@ -93,7 +93,7 @@ export default function DeploymentModal({ isOpen, onClose, projectName }: Deploy
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_name: projectName }),
+        body: JSON.stringify({ project_id: projectName }),
       })
 
       // Check if the response is JSON

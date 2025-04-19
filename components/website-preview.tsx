@@ -5,13 +5,12 @@ import { Loader2 } from "lucide-react"
 // Add imports for the selection mode button
 import { Pointer, X } from "lucide-react"
 
-// Update the WebsitePreviewProps interface to include selected elements
 interface WebsitePreviewProps {
   content: string
-  directory: string
-  isGenerating: boolean
+  projectName: string // Changed from directory
+  isGenerating?: boolean
   onTabActivated?: () => void
-  onElementsSelected?: (elements: SelectedElement[]) => void
+  onElementsSelected?: (elements: { selector: string; html: string }[]) => void
 }
 
 // Add a new interface for selected elements
@@ -28,8 +27,8 @@ interface DeploymentAlias {
 // Update the WebsitePreview component to include selection mode
 export default function WebsitePreview({
   content,
-  directory,
-  isGenerating,
+  projectName, // Changed from directory
+  isGenerating = false,
   onTabActivated,
   onElementsSelected,
 }: WebsitePreviewProps) {
@@ -45,7 +44,7 @@ export default function WebsitePreview({
 
   // Replace startServer with getDeploymentAlias
   const getDeploymentAlias = async () => {
-    if (!directory || isGenerating) return
+    if (!projectName || isGenerating) return
 
     try {
       setIsLoading(true)
@@ -57,7 +56,8 @@ export default function WebsitePreview({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_name: directory }),
+        body: JSON.stringify({ project_id: projectName }),
+        credentials: "include", // Include cookies in the request
       })
 
       // Check if the response is JSON before trying to parse it
@@ -104,7 +104,7 @@ export default function WebsitePreview({
     }
 
     // Get deployment alias if needed, but ONLY if not generating
-    if (directory && !isGenerating && !deploymentAlias && !isLoading) {
+    if (projectName && !isGenerating && !deploymentAlias && !isLoading) {
       getDeploymentAlias()
     }
   }, [])
@@ -133,7 +133,7 @@ export default function WebsitePreview({
     }
 
     // Get deployment alias for this directory, but ONLY if not generating
-    if (directory && !isGenerating) {
+    if (projectName && !isGenerating) {
       getDeploymentAlias()
     }
 
@@ -145,7 +145,7 @@ export default function WebsitePreview({
         iframeRef.current.src = "about:blank"
       }
     }
-  }, [directory, isGenerating])
+  }, [projectName, isGenerating])
 
   // Handle iframe content for placeholder
   useEffect(() => {
@@ -599,7 +599,7 @@ export default function WebsitePreview({
 
         {deploymentAlias ? (
           <iframe
-            key={`preview-${directory}`}
+            key={`preview-${projectName}`}
             ref={iframeRef}
             src={deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`}
             title="Website Preview"
@@ -610,7 +610,7 @@ export default function WebsitePreview({
           />
         ) : (
           <iframe
-            key={`placeholder-${directory}`}
+            key={`placeholder-${projectName}`}
             ref={iframeRef}
             title="Website Preview"
             className="w-full h-full border-none"

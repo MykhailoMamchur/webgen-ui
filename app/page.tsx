@@ -352,7 +352,7 @@ export default function Home() {
             description: `Project ${project.name}`,
             createdAt: new Date(project.created_at),
             updatedAt: new Date(project.created_at), // Use created_at as updatedAt for now
-            directory: project.name, // Keep name as directory for backward compatibility
+            projectName: project.name, // Use name as projectName
             websiteContent: DEFAULT_HTML,
             codeContent: DEFAULT_HTML,
             messages: [],
@@ -383,6 +383,8 @@ export default function Home() {
             ...p,
             createdAt: new Date(p.createdAt),
             updatedAt: new Date(p.updatedAt),
+            // Convert directory to projectName if it exists
+            projectName: p.projectName || p.directory || p.name,
           }))
           setProjects(projectsWithDates)
 
@@ -473,7 +475,7 @@ export default function Home() {
         description,
         createdAt: new Date(),
         updatedAt: new Date(),
-        directory: formattedName, // Keep original casing for backward compatibility
+        projectName: formattedName, // Use name as projectName
         websiteContent: DEFAULT_HTML,
         codeContent: DEFAULT_HTML,
         messages: [welcomeMessage],
@@ -588,7 +590,7 @@ export default function Home() {
             return {
               ...project,
               name: formattedNewName,
-              directory: formattedNewName, // Update directory for backward compatibility
+              projectName: formattedNewName, // Update projectName
               updatedAt: new Date(),
             }
           }
@@ -996,7 +998,7 @@ export default function Home() {
     description: p.description,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
-    directory: p.directory, // Keep original casing
+    projectName: p.projectName, // Use projectName instead of directory
   }))
 
   const currentProjectSummary = currentProjectId
@@ -1203,18 +1205,18 @@ export default function Home() {
             {activeTab === "preview" ? (
               <WebsitePreview
                 content={websiteContent}
-                directory={currentProject?.directory || ""}
+                projectName={currentProject?.name || ""}
                 isGenerating={isGenerating}
                 onTabActivated={() => {
                   // Only check status when preview tab is activated and NOT generating
-                  if (currentProject?.directory && !isGenerating) {
+                  if (currentProject?.name && !isGenerating) {
                     // Status check will happen inside the component
                   }
                 }}
                 onElementsSelected={handleElementsSelected}
               />
             ) : activeTab === "project-files" ? (
-              <ProjectFilesTab projectName={currentProject?.directory || ""} />
+              <ProjectFilesTab projectId={currentProject?.id || ""} projectName={currentProject?.name || ""} />
             ) : (
               <GenerationCodeView code={codeContent} isGenerating={isGenerating} />
             )}
@@ -1232,7 +1234,7 @@ export default function Home() {
         <DeploymentModal
           isOpen={isDeploymentModalOpen}
           onClose={() => setIsDeploymentModalOpen(false)}
-          projectName={currentProject.directory}
+          projectName={currentProject.name}
         />
       )}
     </div>

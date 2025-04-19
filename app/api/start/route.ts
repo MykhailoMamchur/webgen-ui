@@ -8,10 +8,9 @@ export async function POST(request: NextRequest) {
     // Get the access token from the request cookies
     const accessToken = request.cookies.get("access_token")?.value
 
-    // Update the request body to use project_id instead of project_name
-    // Ensure project_id is used consistently
+    // Update the request body to use project_id consistently
     const requestBody = {
-      project_id: body.project_id || body.project_name || body.directory, // Support all formats for backward compatibility
+      project_id: body.project_id || body.project_name || body.projectName, // Support all formats for backward compatibility
     }
 
     // Ensure project_id is provided
