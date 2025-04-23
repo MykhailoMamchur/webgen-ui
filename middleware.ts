@@ -29,7 +29,7 @@ function isTokenExpired(token: string): boolean {
   }
 }
 
-// This function can be marked `async` if using `await` inside
+// Update the middleware function to handle token refresh more intelligently
 export async function middleware(request: NextRequest) {
   // Get the pathname of the request
   const path = request.nextUrl.pathname
@@ -44,8 +44,8 @@ export async function middleware(request: NextRequest) {
   // Check if access token exists and is not expired
   const isAuthenticated = !!accessToken && !isTokenExpired(accessToken)
 
-  // Check if refresh token exists (for potential refresh)
-  const hasRefreshToken = !!refreshToken
+  // Check if refresh token exists and is not expired
+  const hasValidRefreshToken = !!refreshToken && !isTokenExpired(refreshToken)
 
   // Only redirect authenticated users away from public routes
   if (isAuthenticated && isPublicPath) {
@@ -55,14 +55,14 @@ export async function middleware(request: NextRequest) {
 
   // For protected routes, check authentication
   if (!isAuthenticated && !isPublicPath) {
-    // If we have a refresh token but access token is expired, let the client handle refresh
-    // The client-side code will attempt to refresh before redirecting
-    if (hasRefreshToken) {
+    // If we have a valid refresh token but access token is expired,
+    // let the client handle refresh instead of immediately redirecting
+    if (hasValidRefreshToken) {
       // Allow the request to continue - client will handle refresh
       return NextResponse.next()
     }
 
-    // If no refresh token, redirect to signup
+    // If no valid refresh token, redirect to signup
     return NextResponse.redirect(new URL("/signup", request.url))
   }
 

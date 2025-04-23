@@ -151,20 +151,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Set up token refresh interval
   const setupTokenRefresh = () => {
-    // Refresh token every 50 minutes (assuming 1 hour expiry for access token)
+    // Check token expiration every minute
     const refreshInterval = setInterval(
       async () => {
         try {
-          // Use our API route for token refresh
-          await refreshToken()
+          const token = getAuthToken()
+
+          // If token exists and is about to expire (within 5 minutes), refresh it
+          if (token && isTokenExpired(token, 5 * 60)) {
+            // 5 minutes buffer
+            console.log("Token is about to expire, refreshing...")
+            await refreshUserToken()
+          }
         } catch (error) {
-          console.error("Token refresh failed:", error)
-          // If refresh fails, log the user out
-          handleLogout()
-          clearInterval(refreshInterval)
+          console.error("Token refresh check failed:", error)
         }
       },
-      50 * 60 * 1000, // 50 minutes
+      60 * 1000, // Check every minute
     )
 
     return refreshInterval

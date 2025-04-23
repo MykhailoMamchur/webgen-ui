@@ -22,7 +22,7 @@ export const getAuthToken = (): string | null => {
 }
 
 // Helper function to check if a JWT token is expired
-export const isTokenExpired = (token: string): boolean => {
+export const isTokenExpired = (token: string, bufferSeconds = 0): boolean => {
   if (!token) return true
 
   try {
@@ -40,10 +40,10 @@ export const isTokenExpired = (token: string): boolean => {
 
     const { exp } = JSON.parse(jsonPayload)
 
-    // Check if the token is expired
+    // Check if the token is expired or will expire within the buffer time
     if (!exp) return false
     const currentTime = Math.floor(Date.now() / 1000)
-    return currentTime >= exp
+    return currentTime >= exp - bufferSeconds // Subtract buffer time from expiration
   } catch (error) {
     console.error("Error checking token expiration:", error)
     return true // If we can't parse the token, assume it's expired
@@ -247,16 +247,21 @@ export async function getCurrentUser() {
 // Refresh token
 export async function refreshToken() {
   try {
+    console.log("Attempting to refresh token...")
     const response = await fetch("/api/auth/refresh", {
       method: "POST",
       credentials: "include", // Include cookies in the request
     })
 
     if (!response.ok) {
-      throw new Error("Failed to refresh token")
+      const errorData = await response.json()
+      console.error("Token refresh failed:", errorData)
+      throw new Error(errorData.error || errorData.message || "Failed to refresh token")
     }
 
-    return await response.json()
+    const data = await response.json()
+    console.log("Token refreshed successfully")
+    return data
   } catch (error) {
     console.error("Failed to refresh token:", error)
     throw error
