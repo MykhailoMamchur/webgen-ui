@@ -9,20 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Search,
-  Edit2,
-  Trash2,
-  Plus,
-  Check,
-  X,
-  Settings,
-  FileText,
-  Sparkles,
-  Clock,
-  Calendar,
-  Info,
-} from "lucide-react"
+import { Search, Edit2, Trash2, Plus, Check, X, Settings, FileText, Sparkles, Clock, Calendar } from "lucide-react"
 import type { Prompt } from "@/types/prompt"
 import { useToast } from "@/components/ui/use-toast"
 import { motion, AnimatePresence } from "framer-motion"
@@ -314,35 +301,35 @@ export default function PromptsModal({ isOpen, onClose }: PromptsModalProps) {
   const SimplifiedTabs = () => (
     <div className="flex bg-[#252525] border border-purple-500/20 rounded-lg mb-4 overflow-hidden">
       <button
-        className={`flex items-center justify-center px-4 py-2 flex-1 ${
+        className={`flex items-center justify-center px-6 py-2 flex-1 ${
           activeTab === "all"
-            ? "bg-purple-500/20 text-white font-medium"
+            ? "bg-purple-900/50 text-white font-medium"
             : "text-gray-400 hover:text-white hover:bg-purple-500/10"
         }`}
         onClick={() => setActiveTab("all")}
       >
         All Prompts
-        <Badge variant="outline" className="ml-2 bg-[#333] text-white border-purple-500/30">
+        <span className="ml-2 bg-[#444] text-white text-xs font-medium px-2 py-0.5 rounded-full">
           {filteredPrompts.length}
-        </Badge>
+        </span>
       </button>
       <button
-        className={`flex items-center justify-center px-4 py-2 flex-1 ${
+        className={`flex items-center justify-center px-6 py-2 flex-1 ${
           activeTab === "active"
-            ? "bg-purple-500/20 text-white font-medium"
+            ? "bg-purple-900/50 text-white font-medium"
             : "text-gray-400 hover:text-white hover:bg-purple-500/10"
         }`}
         onClick={() => setActiveTab("active")}
       >
         Active Prompts
-        <Badge variant="outline" className="ml-2 bg-purple-500/20 text-white border-purple-500/30">
+        <span className="ml-2 bg-purple-500/30 text-white text-xs font-medium px-2 py-0.5 rounded-full">
           {activePrompts.length}
-        </Badge>
+        </span>
       </button>
       <button
-        className={`flex items-center justify-center px-4 py-2 flex-1 ${
+        className={`flex items-center justify-center px-6 py-2 flex-1 ${
           activeTab === "create"
-            ? "bg-purple-500/20 text-white font-medium"
+            ? "bg-purple-900/50 text-white font-medium"
             : "text-gray-400 hover:text-white hover:bg-purple-500/10"
         }`}
         onClick={() => setActiveTab("create")}
@@ -611,19 +598,6 @@ export default function PromptsModal({ isOpen, onClose }: PromptsModalProps) {
                         placeholder="Describe how you want the AI to generate your website..."
                         className="min-h-[250px] bg-[#333333] border-purple-500/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                       />
-                    </div>
-
-                    <div className="bg-purple-500/10 rounded-lg p-4 flex items-start">
-                      <Info className="h-5 w-5 text-purple-400 mt-0.5 mr-3 flex-shrink-0" />
-                      <div className="text-sm text-gray-300">
-                        <p className="font-medium text-purple-300 mb-1">Prompt Writing Tips</p>
-                        <ul className="list-disc pl-5 space-y-1">
-                          <li>Be specific about the type of website you want</li>
-                          <li>Include details about layout, colors, and functionality</li>
-                          <li>Mention any specific sections or features you need</li>
-                          <li>Describe your target audience and brand voice</li>
-                        </ul>
-                      </div>
                     </div>
                   </div>
                   <div className="flex justify-end gap-3 p-6 border-t border-purple-500/10 bg-[#1E1E1E]">
