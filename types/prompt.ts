@@ -11,7 +11,5 @@ export interface PromptResponse {
   status: string
   prompt?: Prompt
   prompts?: Prompt[]
-  prompt_id?: string
-  message?: string
   error?: string
 }

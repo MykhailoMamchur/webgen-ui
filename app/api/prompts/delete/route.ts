@@ -21,6 +21,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: "error", error: "Prompt ID is required" }, { status: 400 })
     }
 
+    console.log("Deleting prompt with token:", token)
+    console.log("Request body:", { prompt_id })
+
     // Forward the request to the backend API with the auth token
     const response = await fetch(`${API_BASE_URL}/prompts/delete`, {
       method: "POST",
@@ -33,7 +36,20 @@ export async function POST(request: Request) {
       }),
     })
 
-    const data = await response.json()
+    console.log("API response status:", response.status)
+
+    // Log the response body for debugging
+    const responseText = await response.text()
+    console.log("API response body:", responseText)
+
+    // Parse the response as JSON
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (e) {
+      console.error("Error parsing JSON response:", e)
+      return NextResponse.json({ status: "error", error: "Invalid response from server" }, { status: 500 })
+    }
 
     if (!response.ok) {
       return NextResponse.json(
