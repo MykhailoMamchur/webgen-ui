@@ -9,9 +9,9 @@ import { AuthProvider } from "@/context/auth-context"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: 'Manufactura Console',
-  description: 'Manufactura Console',
-  generator: 'Manufactura',
+  title: "Manufactura Console",
+  description: "Manufactura Console",
+  generator: "Manufactura",
 }
 
 // Update the layout to include the AuthProvider
@@ -34,5 +34,4 @@ export default function RootLayout({
   )
 }
 
-
-import './globals.css'
+import "./globals.css"

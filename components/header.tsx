@@ -1,11 +1,12 @@
 "use client"
 
-import { Sparkles, ExternalLink, Upload } from "lucide-react"
+import { Sparkles, ExternalLink, Upload, Settings } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import ProjectSelector from "@/components/project-selector"
 import { AuthNav } from "@/components/auth-nav"
 import type { ProjectSummary } from "@/types/project"
+import PromptsModal from "@/components/prompts-modal"
 
 interface HeaderProps {
   currentProject: ProjectSummary | null
@@ -16,6 +17,7 @@ interface HeaderProps {
   onRenameProject?: (projectId: string, newName: string) => void
   isGenerating?: boolean
   onDeploy?: () => void
+  onOpenPrompts?: () => void
 }
 
 interface DeploymentAlias {
@@ -32,11 +34,14 @@ export default function Header({
   onRenameProject,
   isGenerating = false,
   onDeploy,
+  onOpenPrompts,
 }: HeaderProps) {
   const [deploymentAlias, setDeploymentAlias] = useState<string | null>(null)
   const [isLoadingAlias, setIsLoadingAlias] = useState(false)
   // Add an error state to track deployment alias failures
   const [deploymentError, setDeploymentError] = useState<boolean>(false)
+  // Add state for prompts modal
+  const [isPromptsModalOpen, setIsPromptsModalOpen] = useState(false)
 
   // Update the useEffect to use project_id
   // Check for deployment alias when the current project changes
@@ -119,6 +124,15 @@ export default function Header({
     }
   }
 
+  // Handle opening prompts modal
+  const handleOpenPromptsModal = () => {
+    if (onOpenPrompts) {
+      onOpenPrompts()
+    } else {
+      setIsPromptsModalOpen(true)
+    }
+  }
+
   return (
     <header className="border-b border-purple-900/20 bg-[#13111C] h-16 flex items-center px-6 sticky top-0 z-10">
       <div className="flex items-center">
@@ -152,6 +166,18 @@ export default function Header({
           Preview
         </Button>
 
+        {/* Add Settings button for prompts */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleOpenPromptsModal}
+          disabled={isGenerating}
+          className="bg-background/30 border-purple-500/30 text-purple-100 hover:bg-purple-500/20 hover:text-white"
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Prompts
+        </Button>
+
         <Button
           variant="default"
           size="sm"
@@ -163,6 +189,9 @@ export default function Header({
           Deploy
         </Button>
       </div>
+
+      {/* Add PromptsModal if using internal state */}
+      {!onOpenPrompts && <PromptsModal isOpen={isPromptsModalOpen} onClose={() => setIsPromptsModalOpen(false)} />}
     </header>
   )
 }

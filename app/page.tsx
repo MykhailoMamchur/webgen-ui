@@ -11,6 +11,7 @@ import GenerationCodeView from "@/components/generation-code-view"
 import ProjectFilesTab from "@/components/project-files-tab"
 import type { Project, ProjectSummary } from "@/types/project"
 import DeploymentModal from "@/components/deployment-modal"
+import PromptsModal from "@/components/prompts-modal"
 import { useAuth } from "@/context/auth-context"
 
 // Update the DEFAULT_HTML to be empty
@@ -211,6 +212,8 @@ export default function Home() {
   const [restoringCheckpoint, setRestoringCheckpoint] = useState<string | null>(null)
   // Add state for deployment modal
   const [isDeploymentModalOpen, setIsDeploymentModalOpen] = useState(false)
+  // Add state for prompts modal
+  const [isPromptsModalOpen, setIsPromptsModalOpen] = useState(false)
 
   // Projects state
   const [projects, setProjects] = useState<Project[]>([])
@@ -790,6 +793,27 @@ export default function Home() {
         }
       }
 
+      // Get the active prompt if available
+      try {
+        const promptResponse = await fetch("/api/prompts/get_active", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        })
+
+        if (promptResponse.ok) {
+          const promptData = await promptResponse.json()
+          if (promptData.status === "success" && promptData.prompt) {
+            // Add the active prompt to the request
+            requestBody.prompt = promptData.prompt.prompt_text
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching active prompt:", error)
+      }
+
       // Pass the abort signal to ensure server-side processing stops when aborted
       const response = await fetch("/api/edit", {
         method: "POST",
@@ -999,6 +1023,11 @@ export default function Home() {
     setIsDeploymentModalOpen(true)
   }
 
+  // Handle opening prompts modal
+  const handleOpenPrompts = () => {
+    setIsPromptsModalOpen(true)
+  }
+
   const tabs = [
     { id: "preview", label: "Preview" },
     { id: "generation", label: "Generation" },
@@ -1193,6 +1222,7 @@ export default function Home() {
         onRenameProject={handleRenameProject}
         isGenerating={isGenerating}
         onDeploy={handleDeploy}
+        onOpenPrompts={handleOpenPrompts}
       />
       <div className="flex flex-1 overflow-hidden">
         <ChatSidebar
@@ -1253,6 +1283,9 @@ export default function Home() {
           projectId={currentProject.id} // Pass projectId to DeploymentModal
         />
       )}
+
+      {/* Add the PromptsModal */}
+      <PromptsModal isOpen={isPromptsModalOpen} onClose={() => setIsPromptsModalOpen(false)} />
     </div>
   )
 }
