@@ -69,6 +69,8 @@ export default function PromptsModal({ isOpen, onClose }: PromptsModalProps) {
         description: error instanceof Error ? error.message : "Failed to load prompts. Please try again.",
         variant: "destructive",
       })
+      // Set empty array to avoid showing loading spinner indefinitely
+      setPrompts([])
     } finally {
       setLoading(false)
     }

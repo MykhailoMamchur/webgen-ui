@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server"
-import { getAuthToken } from "@/lib/auth"
+import { cookies } from "next/headers"
 
 // Use a hardcoded API base URL
 const API_BASE_URL = "https://wegenweb.com/api"
 
 export async function POST(request: Request) {
   try {
-    // Get the auth token
-    const token = getAuthToken()
+    // Get the auth token from cookies
+    const cookieStore = cookies()
+    const token = cookieStore.get("access_token")?.value
 
     if (!token) {
+      console.error("No authentication token found in cookies")
       return NextResponse.json({ status: "error", error: "Authentication required" }, { status: 401 })
     }
 
@@ -21,7 +23,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: "error", error: "Prompt ID is required" }, { status: 400 })
     }
 
-    console.log("Activating prompt with token:", token)
+    console.log("Activating prompt with token:", token.substring(0, 10) + "...")
     console.log("Request body:", { prompt_id })
 
     // Forward the request to the backend API with the auth token
