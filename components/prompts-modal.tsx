@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Search,
   Edit2,
@@ -23,7 +21,6 @@ import {
   Sparkles,
   Clock,
   Calendar,
-  ChevronRight,
   Info,
 } from "lucide-react"
 import type { Prompt } from "@/types/prompt"
@@ -313,6 +310,49 @@ export default function PromptsModal({ isOpen, onClose }: PromptsModalProps) {
   const activePrompts = filteredPrompts.filter((prompt) => prompt.is_active)
   const inactivePrompts = filteredPrompts.filter((prompt) => !prompt.is_active)
 
+  // Simplified tab navigation component
+  const SimplifiedTabs = () => (
+    <div className="flex bg-[#252525] border border-purple-500/20 rounded-lg mb-4 overflow-hidden">
+      <button
+        className={`flex items-center justify-center px-4 py-2 flex-1 ${
+          activeTab === "all"
+            ? "bg-purple-500/20 text-white font-medium"
+            : "text-gray-400 hover:text-white hover:bg-purple-500/10"
+        }`}
+        onClick={() => setActiveTab("all")}
+      >
+        All Prompts
+        <Badge variant="outline" className="ml-2 bg-[#333] text-white border-purple-500/30">
+          {filteredPrompts.length}
+        </Badge>
+      </button>
+      <button
+        className={`flex items-center justify-center px-4 py-2 flex-1 ${
+          activeTab === "active"
+            ? "bg-purple-500/20 text-white font-medium"
+            : "text-gray-400 hover:text-white hover:bg-purple-500/10"
+        }`}
+        onClick={() => setActiveTab("active")}
+      >
+        Active Prompts
+        <Badge variant="outline" className="ml-2 bg-purple-500/20 text-white border-purple-500/30">
+          {activePrompts.length}
+        </Badge>
+      </button>
+      <button
+        className={`flex items-center justify-center px-4 py-2 flex-1 ${
+          activeTab === "create"
+            ? "bg-purple-500/20 text-white font-medium"
+            : "text-gray-400 hover:text-white hover:bg-purple-500/10"
+        }`}
+        onClick={() => setActiveTab("create")}
+      >
+        <Plus className="h-4 w-4 mr-1" />
+        Create New
+      </button>
+    </div>
+  )
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[900px] max-h-[90vh] p-0 bg-gradient-to-b from-[#1A1A1A] to-[#121212] text-white border border-purple-500/20 rounded-xl overflow-hidden shadow-2xl">
@@ -368,79 +408,130 @@ export default function PromptsModal({ isOpen, onClose }: PromptsModalProps) {
             )}
           </div>
 
-          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full bg-[#252525] border border-purple-500/20 rounded-lg mb-4 p-1">
-              <TabsTrigger
-                value="all"
-                className="data-[state=active]:bg-purple-500/20 data-[state=active]:text-white rounded-md"
-              >
-                All Prompts
-                <Badge variant="outline" className="ml-2 bg-[#333] text-white border-purple-500/30">
-                  {filteredPrompts.length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger
-                value="active"
-                className="data-[state=active]:bg-purple-500/20 data-[state=active]:text-white rounded-md"
-              >
-                Active Prompts
-                <Badge variant="outline" className="ml-2 bg-purple-500/20 text-white border-purple-500/30">
-                  {activePrompts.length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger
-                value="create"
-                className="data-[state=active]:bg-purple-500/20 data-[state=active]:text-white rounded-md"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Create New
-              </TabsTrigger>
-            </TabsList>
+          <SimplifiedTabs />
 
-            {loading ? (
-              <div className="flex justify-center items-center py-16">
-                <div className="flex flex-col items-center">
-                  <div className="relative h-12 w-12">
-                    <div className="absolute inset-0 rounded-full border-t-2 border-purple-500 animate-spin"></div>
-                    <div className="absolute inset-2 rounded-full border-t-2 border-purple-300 animate-spin animation-delay-150"></div>
-                    <div className="absolute inset-4 rounded-full border-t-2 border-purple-100 animate-spin animation-delay-300"></div>
-                  </div>
-                  <p className="text-purple-300 mt-4 font-medium">Loading prompts...</p>
+          {loading ? (
+            <div className="flex justify-center items-center py-16">
+              <div className="flex flex-col items-center">
+                <div className="relative h-12 w-12">
+                  <div className="absolute inset-0 rounded-full border-t-2 border-purple-500 animate-spin"></div>
+                  <div className="absolute inset-2 rounded-full border-t-2 border-purple-300 animate-spin animation-delay-150"></div>
+                  <div className="absolute inset-4 rounded-full border-t-2 border-purple-100 animate-spin animation-delay-300"></div>
                 </div>
+                <p className="text-purple-300 mt-4 font-medium">Loading prompts...</p>
               </div>
-            ) : (
-              <>
-                <TabsContent value="all" className="m-0 outline-none">
-                  <ScrollArea className="h-[500px] pr-4">
-                    <AnimatePresence>
-                      {filteredPrompts.length === 0 ? (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="flex flex-col items-center justify-center py-16 text-center"
-                        >
-                          {searchQuery ? (
-                            <>
-                              <Search className="h-16 w-16 text-purple-500/30 mb-4" />
-                              <h3 className="text-xl font-medium text-white mb-2">No matching prompts</h3>
-                              <p className="text-gray-400 max-w-md">
-                                No prompts match your search query "{searchQuery}".
-                              </p>
+            </div>
+          ) : (
+            <>
+              {activeTab === "all" && (
+                <ScrollArea className="h-[500px] pr-4">
+                  <AnimatePresence>
+                    {filteredPrompts.length === 0 ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="flex flex-col items-center justify-center py-16 text-center"
+                      >
+                        {searchQuery ? (
+                          <>
+                            <Search className="h-16 w-16 text-purple-500/30 mb-4" />
+                            <h3 className="text-xl font-medium text-white mb-2">No matching prompts</h3>
+                            <p className="text-gray-400 max-w-md">
+                              No prompts match your search query "{searchQuery}".
+                            </p>
+                            <Button
+                              onClick={() => setSearchQuery("")}
+                              className="mt-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
+                            >
+                              Clear Search
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="h-16 w-16 text-purple-500/30 mb-4" />
+                            <h3 className="text-xl font-medium text-white mb-2">No prompts found</h3>
+                            <p className="text-gray-400 max-w-md">
+                              Create your first prompt to enhance your website generation experience.
+                            </p>
+                            <Button
+                              onClick={() => {
+                                setActiveTab("create")
+                                setIsCreating(true)
+                              }}
+                              className="mt-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Create New Prompt
+                            </Button>
+                          </>
+                        )}
+                      </motion.div>
+                    ) : (
+                      <div className="space-y-4">
+                        {filteredPrompts.map((prompt, index) => (
+                          <motion.div
+                            key={prompt.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.2, delay: index * 0.05 }}
+                          >
+                            <PromptCard
+                              prompt={prompt}
+                              onEdit={() => setEditingPrompt(prompt)}
+                              onDelete={() => handleDeletePrompt(prompt.id)}
+                              onActivate={() => handleActivatePrompt(prompt.id)}
+                              formatDate={formatDate}
+                              searchQuery={searchQuery}
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </ScrollArea>
+              )}
+
+              {activeTab === "active" && (
+                <ScrollArea className="h-[500px] pr-4">
+                  <AnimatePresence>
+                    {activePrompts.length === 0 ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="flex flex-col items-center justify-center py-16 text-center"
+                      >
+                        {searchQuery ? (
+                          <>
+                            <Search className="h-16 w-16 text-purple-500/30 mb-4" />
+                            <h3 className="text-xl font-medium text-white mb-2">No matching active prompts</h3>
+                            <p className="text-gray-400 max-w-md">
+                              No active prompts match your search query "{searchQuery}".
+                            </p>
+                            <Button
+                              onClick={() => setSearchQuery("")}
+                              className="mt-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
+                            >
+                              Clear Search
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-16 w-16 text-purple-500/30 mb-4" />
+                            <h3 className="text-xl font-medium text-white mb-2">No active prompts</h3>
+                            <p className="text-gray-400 max-w-md">
+                              Activate a prompt to use it in your website generation process.
+                            </p>
+                            {inactivePrompts.length > 0 ? (
                               <Button
-                                onClick={() => setSearchQuery("")}
+                                onClick={() => setActiveTab("all")}
                                 className="mt-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
                               >
-                                Clear Search
+                                View All Prompts
                               </Button>
-                            </>
-                          ) : (
-                            <>
-                              <FileText className="h-16 w-16 text-purple-500/30 mb-4" />
-                              <h3 className="text-xl font-medium text-white mb-2">No prompts found</h3>
-                              <p className="text-gray-400 max-w-md">
-                                Create your first prompt to enhance your website generation experience.
-                              </p>
+                            ) : (
                               <Button
                                 onClick={() => {
                                   setActiveTab("create")
@@ -451,194 +542,115 @@ export default function PromptsModal({ isOpen, onClose }: PromptsModalProps) {
                                 <Plus className="h-4 w-4 mr-2" />
                                 Create New Prompt
                               </Button>
-                            </>
-                          )}
-                        </motion.div>
-                      ) : (
-                        <div className="space-y-4">
-                          {filteredPrompts.map((prompt, index) => (
-                            <motion.div
-                              key={prompt.id}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -20 }}
-                              transition={{ duration: 0.2, delay: index * 0.05 }}
-                            >
-                              <PromptCard
-                                prompt={prompt}
-                                onEdit={() => setEditingPrompt(prompt)}
-                                onDelete={() => handleDeletePrompt(prompt.id)}
-                                onActivate={() => handleActivatePrompt(prompt.id)}
-                                formatDate={formatDate}
-                                searchQuery={searchQuery}
-                              />
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
-                    </AnimatePresence>
-                  </ScrollArea>
-                </TabsContent>
+                            )}
+                          </>
+                        )}
+                      </motion.div>
+                    ) : (
+                      <div className="space-y-4">
+                        {activePrompts.map((prompt, index) => (
+                          <motion.div
+                            key={prompt.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.2, delay: index * 0.05 }}
+                          >
+                            <PromptCard
+                              prompt={prompt}
+                              onEdit={() => setEditingPrompt(prompt)}
+                              onDelete={() => handleDeletePrompt(prompt.id)}
+                              onActivate={() => handleActivatePrompt(prompt.id)}
+                              formatDate={formatDate}
+                              searchQuery={searchQuery}
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </ScrollArea>
+              )}
 
-                <TabsContent value="active" className="m-0 outline-none">
-                  <ScrollArea className="h-[500px] pr-4">
-                    <AnimatePresence>
-                      {activePrompts.length === 0 ? (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="flex flex-col items-center justify-center py-16 text-center"
-                        >
-                          {searchQuery ? (
-                            <>
-                              <Search className="h-16 w-16 text-purple-500/30 mb-4" />
-                              <h3 className="text-xl font-medium text-white mb-2">No matching active prompts</h3>
-                              <p className="text-gray-400 max-w-md">
-                                No active prompts match your search query "{searchQuery}".
-                              </p>
-                              <Button
-                                onClick={() => setSearchQuery("")}
-                                className="mt-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
-                              >
-                                Clear Search
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-16 w-16 text-purple-500/30 mb-4" />
-                              <h3 className="text-xl font-medium text-white mb-2">No active prompts</h3>
-                              <p className="text-gray-400 max-w-md">
-                                Activate a prompt to use it in your website generation process.
-                              </p>
-                              {inactivePrompts.length > 0 ? (
-                                <Button
-                                  onClick={() => setActiveTab("all")}
-                                  className="mt-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
-                                >
-                                  View All Prompts
-                                </Button>
-                              ) : (
-                                <Button
-                                  onClick={() => {
-                                    setActiveTab("create")
-                                    setIsCreating(true)
-                                  }}
-                                  className="mt-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
-                                >
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  Create New Prompt
-                                </Button>
-                              )}
-                            </>
-                          )}
-                        </motion.div>
-                      ) : (
-                        <div className="space-y-4">
-                          {activePrompts.map((prompt, index) => (
-                            <motion.div
-                              key={prompt.id}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -20 }}
-                              transition={{ duration: 0.2, delay: index * 0.05 }}
-                            >
-                              <PromptCard
-                                prompt={prompt}
-                                onEdit={() => setEditingPrompt(prompt)}
-                                onDelete={() => handleDeletePrompt(prompt.id)}
-                                onActivate={() => handleActivatePrompt(prompt.id)}
-                                formatDate={formatDate}
-                                searchQuery={searchQuery}
-                              />
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
-                    </AnimatePresence>
-                  </ScrollArea>
-                </TabsContent>
-
-                <TabsContent value="create" className="m-0 outline-none">
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="bg-[#252525] border border-purple-500/20 rounded-xl overflow-hidden"
-                  >
-                    <div className="p-6 border-b border-purple-500/10">
-                      <h3 className="text-xl font-medium text-white mb-1">Create New Prompt</h3>
-                      <p className="text-gray-400 text-sm">
-                        Define a custom prompt to guide the AI in generating your website
-                      </p>
+              {activeTab === "create" && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="bg-[#252525] border border-purple-500/20 rounded-xl overflow-hidden"
+                >
+                  <div className="p-6 border-b border-purple-500/10">
+                    <h3 className="text-xl font-medium text-white mb-1">Create New Prompt</h3>
+                    <p className="text-gray-400 text-sm">
+                      Define a custom prompt to guide the AI in generating your website
+                    </p>
+                  </div>
+                  <div className="p-6 space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-prompt-name" className="text-white flex items-center">
+                        Prompt Name
+                        <span className="text-red-400 ml-1">*</span>
+                      </Label>
+                      <Input
+                        id="new-prompt-name"
+                        value={newPromptName}
+                        onChange={(e) => setNewPromptName(e.target.value)}
+                        placeholder="E.g., E-commerce Site, Portfolio, Blog"
+                        className="bg-[#333333] border-purple-500/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                      />
                     </div>
-                    <div className="p-6 space-y-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="new-prompt-name" className="text-white flex items-center">
-                          Prompt Name
-                          <span className="text-red-400 ml-1">*</span>
-                        </Label>
-                        <Input
-                          id="new-prompt-name"
-                          value={newPromptName}
-                          onChange={(e) => setNewPromptName(e.target.value)}
-                          placeholder="E.g., E-commerce Site, Portfolio, Blog"
-                          className="bg-[#333333] border-purple-500/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="new-prompt-text" className="text-white flex items-center">
-                          Prompt Text
-                          <span className="text-red-400 ml-1">*</span>
-                        </Label>
-                        <Textarea
-                          id="new-prompt-text"
-                          value={newPromptText}
-                          onChange={(e) => setNewPromptText(e.target.value)}
-                          placeholder="Describe how you want the AI to generate your website..."
-                          className="min-h-[250px] bg-[#333333] border-purple-500/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-prompt-text" className="text-white flex items-center">
+                        Prompt Text
+                        <span className="text-red-400 ml-1">*</span>
+                      </Label>
+                      <Textarea
+                        id="new-prompt-text"
+                        value={newPromptText}
+                        onChange={(e) => setNewPromptText(e.target.value)}
+                        placeholder="Describe how you want the AI to generate your website..."
+                        className="min-h-[250px] bg-[#333333] border-purple-500/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                      />
+                    </div>
 
-                      <div className="bg-purple-500/10 rounded-lg p-4 flex items-start">
-                        <Info className="h-5 w-5 text-purple-400 mt-0.5 mr-3 flex-shrink-0" />
-                        <div className="text-sm text-gray-300">
-                          <p className="font-medium text-purple-300 mb-1">Prompt Writing Tips</p>
-                          <ul className="list-disc pl-5 space-y-1">
-                            <li>Be specific about the type of website you want</li>
-                            <li>Include details about layout, colors, and functionality</li>
-                            <li>Mention any specific sections or features you need</li>
-                            <li>Describe your target audience and brand voice</li>
-                          </ul>
-                        </div>
+                    <div className="bg-purple-500/10 rounded-lg p-4 flex items-start">
+                      <Info className="h-5 w-5 text-purple-400 mt-0.5 mr-3 flex-shrink-0" />
+                      <div className="text-sm text-gray-300">
+                        <p className="font-medium text-purple-300 mb-1">Prompt Writing Tips</p>
+                        <ul className="list-disc pl-5 space-y-1">
+                          <li>Be specific about the type of website you want</li>
+                          <li>Include details about layout, colors, and functionality</li>
+                          <li>Mention any specific sections or features you need</li>
+                          <li>Describe your target audience and brand voice</li>
+                        </ul>
                       </div>
                     </div>
-                    <div className="flex justify-end gap-3 p-6 border-t border-purple-500/10 bg-[#1E1E1E]">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setNewPromptName("")
-                          setNewPromptText("")
-                          setActiveTab("all")
-                        }}
-                        className="border-purple-500/30 text-white hover:bg-purple-500/20"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleCreatePrompt}
-                        disabled={!newPromptName.trim() || !newPromptText.trim()}
-                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Prompt
-                      </Button>
-                    </div>
-                  </motion.div>
-                </TabsContent>
-              </>
-            )}
-          </Tabs>
+                  </div>
+                  <div className="flex justify-end gap-3 p-6 border-t border-purple-500/10 bg-[#1E1E1E]">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setNewPromptName("")
+                        setNewPromptText("")
+                        setActiveTab("all")
+                      }}
+                      className="border-purple-500/30 text-white hover:bg-purple-500/20"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleCreatePrompt}
+                      disabled={!newPromptName.trim() || !newPromptText.trim()}
+                      className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Prompt
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </>
+          )}
         </div>
 
         {editingPrompt && (
@@ -751,13 +763,18 @@ function PromptCard({ prompt, onEdit, onDelete, onActivate, formatDate, searchQu
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="flex items-center">
-              <Switch
-                checked={prompt.is_active}
-                onCheckedChange={onActivate}
-                className="data-[state=checked]:bg-purple-600"
-              />
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onActivate}
+              className={`px-3 py-1 rounded-md text-sm ${
+                prompt.is_active
+                  ? "bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
+                  : "text-gray-400 hover:text-white hover:bg-purple-500/20"
+              }`}
+            >
+              {prompt.is_active ? "Active" : "Activate"}
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -784,18 +801,6 @@ function PromptCard({ prompt, onEdit, onDelete, onActivate, formatDate, searchQu
             {searchQuery ? highlightText(prompt.prompt_text, searchQuery) : prompt.prompt_text}
           </p>
         </div>
-      </div>
-      <div className="bg-[#1E1E1E] px-5 py-3 border-t border-purple-500/10 flex justify-end">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onEdit}
-          className="text-purple-300 hover:text-white hover:bg-purple-500/20"
-        >
-          <Edit2 className="h-3.5 w-3.5 mr-1.5" />
-          Edit Prompt
-          <ChevronRight className="h-3.5 w-3.5 ml-1" />
-        </Button>
       </div>
     </div>
   )

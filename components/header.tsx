@@ -16,6 +16,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import ProjectSelector from "@/components/project-selector"
 import type { ProjectSummary } from "@/types/project"
 import PromptsModal from "@/components/prompts-modal"
+import { logoutUser } from "@/lib/auth"
+import { useRouter } from "next/navigation"
 
 interface HeaderProps {
   currentProject: ProjectSummary | null
@@ -34,6 +36,12 @@ interface DeploymentAlias {
   alias: string
 }
 
+interface UserData {
+  id: string
+  email: string
+  name?: string
+}
+
 export default function Header({
   currentProject,
   projects,
@@ -50,6 +58,35 @@ export default function Header({
   const [deploymentError, setDeploymentError] = useState<boolean>(false)
   const [isPromptsModalOpen, setIsPromptsModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [userData, setUserData] = useState<UserData | null>(null)
+  const [isLoadingUser, setIsLoadingUser] = useState(true)
+  const router = useRouter()
+
+  // Fetch user data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setIsLoadingUser(true)
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setUserData(data)
+        } else {
+          console.error("Failed to fetch user data")
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error)
+      } finally {
+        setIsLoadingUser(false)
+      }
+    }
+
+    fetchUserData()
+  }, [])
 
   // Update the useEffect to use project_id
   useEffect(() => {
@@ -130,11 +167,23 @@ export default function Header({
     }
   }
 
-  // Mock user data - replace with actual user data from your auth context
-  const user = {
-    name: "User",
-    email: "mamchurmykhallo@gmail.com",
-    avatar: null,
+  const handleSignOut = async () => {
+    try {
+      await logoutUser()
+      router.push("/login")
+    } catch (error) {
+      console.error("Error signing out:", error)
+    }
+  }
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (userData?.name) {
+      return userData.name.charAt(0).toUpperCase()
+    } else if (userData?.email) {
+      return userData.email.charAt(0).toUpperCase()
+    }
+    return "U"
   }
 
   return (
@@ -227,10 +276,12 @@ export default function Header({
             >
               <Avatar className="h-7 w-7 mr-2 border border-purple-500/30">
                 <AvatarFallback className="bg-purple-900/30 text-purple-200 text-xs">
-                  {user.name.charAt(0)}
+                  {getUserInitials()}
                 </AvatarFallback>
               </Avatar>
-              <span className="hidden md:inline-block max-w-[150px] truncate">{user.email}</span>
+              <span className="hidden md:inline-block max-w-[150px] truncate">
+                {isLoadingUser ? "Loading..." : userData?.email || "User"}
+              </span>
               <ChevronDown className="h-4 w-4 ml-1 opacity-70" />
             </Button>
           </DropdownMenuTrigger>
@@ -269,7 +320,10 @@ export default function Header({
             </DropdownMenuItem>
 
             <DropdownMenuSeparator className="bg-purple-500/10" />
-            <DropdownMenuItem className="text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer">
+            <DropdownMenuItem
+              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer"
+              onClick={handleSignOut}
+            >
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
             </DropdownMenuItem>
