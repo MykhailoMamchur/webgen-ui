@@ -1,10 +1,19 @@
 "use client"
 
-import { Sparkles, ExternalLink, Upload, Settings } from "lucide-react"
+import { Sparkles, ExternalLink, Upload, Settings, User, ChevronDown, LogOut, Menu } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import ProjectSelector from "@/components/project-selector"
-import { AuthNav } from "@/components/auth-nav"
 import type { ProjectSummary } from "@/types/project"
 import PromptsModal from "@/components/prompts-modal"
 
@@ -38,13 +47,11 @@ export default function Header({
 }: HeaderProps) {
   const [deploymentAlias, setDeploymentAlias] = useState<string | null>(null)
   const [isLoadingAlias, setIsLoadingAlias] = useState(false)
-  // Add an error state to track deployment alias failures
   const [deploymentError, setDeploymentError] = useState<boolean>(false)
-  // Add state for prompts modal
   const [isPromptsModalOpen, setIsPromptsModalOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // Update the useEffect to use project_id
-  // Check for deployment alias when the current project changes
   useEffect(() => {
     if (currentProject?.id && !isGenerating) {
       getDeploymentAlias(currentProject.id)
@@ -53,8 +60,6 @@ export default function Header({
     }
   }, [currentProject, isGenerating])
 
-  // Update the getDeploymentAlias function to use project_id
-  // Update the getDeploymentAlias function to handle errors properly
   const getDeploymentAlias = async (projectId: string) => {
     try {
       setIsLoadingAlias(true)
@@ -68,10 +73,8 @@ export default function Header({
         body: JSON.stringify({ project_id: projectId }),
       })
 
-      // Check if the response is JSON before trying to parse it
       const contentType = response.headers.get("content-type")
       if (!contentType || !contentType.includes("application/json")) {
-        // If not JSON, get the text and log it for debugging
         const text = await response.text()
         console.error("Non-JSON response:", text)
         setDeploymentError(true)
@@ -100,21 +103,16 @@ export default function Header({
     }
   }
 
-  // Update the isPreviewEnabled condition to check for deployment errors
   const isPreviewEnabled =
     currentProject?.id && !isLoadingAlias && ((!isGenerating && !deploymentError) || deploymentAlias !== null)
 
-  // Update the handlePreviewClick function to use project_id
-  // Handle preview button click
   const handlePreviewClick = () => {
     if (!currentProject?.id) return
 
     if (deploymentAlias) {
-      // Ensure the URL has https:// prefix
       const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
       window.open(url, "_blank")
     } else {
-      // If we don't have an alias yet, try to get one and then open it
       getDeploymentAlias(currentProject.id).then(() => {
         if (deploymentAlias) {
           const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
@@ -124,7 +122,6 @@ export default function Header({
     }
   }
 
-  // Handle opening prompts modal
   const handleOpenPromptsModal = () => {
     if (onOpenPrompts) {
       onOpenPrompts()
@@ -133,64 +130,153 @@ export default function Header({
     }
   }
 
+  // Mock user data - replace with actual user data from your auth context
+  const user = {
+    name: "User",
+    email: "mamchurmykhallo@gmail.com",
+    avatar: null,
+  }
+
   return (
-    <header className="border-b border-purple-900/20 bg-[#13111C] h-16 flex items-center px-6 sticky top-0 z-10">
+    <header className="border-b border-purple-900/20 bg-gradient-to-r from-[#13111C] to-[#1A1A1A] h-16 flex items-center px-4 md:px-6 sticky top-0 z-10 shadow-md">
       <div className="flex items-center">
-        <div className="flex items-center gap-2 mr-8">
+        <div className="flex items-center gap-2 mr-6">
           <Sparkles className="h-5 w-5 text-purple-400" />
           <h1 className="text-xl font-semibold tracking-tight text-white">manufactura.ai</h1>
         </div>
 
-        <ProjectSelector
-          currentProject={currentProject}
-          projects={projects}
-          onSelectProject={onSelectProject}
-          onNewProject={onNewProject}
-          onDeleteProject={onDeleteProject}
-          onRenameProject={onRenameProject}
-          isGenerating={isGenerating}
-        />
-      </div>
-
-      <div className="ml-auto flex items-center gap-3">
-        <AuthNav />
+        <div className="hidden md:block">
+          <ProjectSelector
+            currentProject={currentProject}
+            projects={projects}
+            onSelectProject={onSelectProject}
+            onNewProject={onNewProject}
+            onDeleteProject={onDeleteProject}
+            onRenameProject={onRenameProject}
+            isGenerating={isGenerating}
+          />
+        </div>
 
         <Button
-          variant="outline"
-          size="sm"
-          onClick={handlePreviewClick}
-          disabled={!isPreviewEnabled}
-          className="bg-background/30 border-purple-500/30 text-purple-100 hover:bg-purple-500/20 hover:text-white"
+          variant="ghost"
+          size="icon"
+          className="md:hidden text-gray-400 hover:text-white"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         >
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Preview
-        </Button>
-
-        {/* Add Settings button for prompts */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleOpenPromptsModal}
-          disabled={isGenerating}
-          className="bg-background/30 border-purple-500/30 text-purple-100 hover:bg-purple-500/20 hover:text-white"
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          Prompts
-        </Button>
-
-        <Button
-          variant="default"
-          size="sm"
-          onClick={onDeploy}
-          disabled={!currentProject || isGenerating}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          Deploy
+          <Menu className="h-5 w-5" />
         </Button>
       </div>
 
-      {/* Add PromptsModal if using internal state */}
+      <div className="ml-auto flex items-center gap-2">
+        <TooltipProvider>
+          <div className="hidden md:flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handlePreviewClick}
+                  disabled={!isPreviewEnabled}
+                  className="h-9 w-9 rounded-full text-gray-300 hover:text-white hover:bg-purple-500/20 disabled:opacity-50"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="sr-only">Preview</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Preview Website</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleOpenPromptsModal}
+                  disabled={isGenerating}
+                  className="h-9 w-9 rounded-full text-gray-300 hover:text-white hover:bg-purple-500/20 disabled:opacity-50"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span className="sr-only">Prompts</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Manage Prompts</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onDeploy}
+              disabled={!currentProject || isGenerating}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-full px-4"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Deploy
+            </Button>
+          </div>
+        </TooltipProvider>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className="h-9 rounded-full px-2 text-sm text-gray-300 hover:text-white hover:bg-purple-500/20"
+            >
+              <Avatar className="h-7 w-7 mr-2 border border-purple-500/30">
+                <AvatarFallback className="bg-purple-900/30 text-purple-200 text-xs">
+                  {user.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="hidden md:inline-block max-w-[150px] truncate">{user.email}</span>
+              <ChevronDown className="h-4 w-4 ml-1 opacity-70" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 bg-[#252525] border-purple-500/20 text-white">
+            <DropdownMenuLabel className="text-gray-400">My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-purple-500/10" />
+            <DropdownMenuItem className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer">
+              <User className="h-4 w-4 mr-2 text-purple-400" />
+              Profile Settings
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer md:hidden"
+              onClick={handleOpenPromptsModal}
+            >
+              <Settings className="h-4 w-4 mr-2 text-purple-400" />
+              Manage Prompts
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer md:hidden"
+              onClick={handlePreviewClick}
+              disabled={!isPreviewEnabled}
+            >
+              <ExternalLink className="h-4 w-4 mr-2 text-purple-400" />
+              Preview Website
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer md:hidden"
+              onClick={onDeploy}
+              disabled={!currentProject || isGenerating}
+            >
+              <Upload className="h-4 w-4 mr-2 text-purple-400" />
+              Deploy Website
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator className="bg-purple-500/10" />
+            <DropdownMenuItem className="text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       {!onOpenPrompts && <PromptsModal isOpen={isPromptsModalOpen} onClose={() => setIsPromptsModalOpen(false)} />}
     </header>
   )
