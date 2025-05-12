@@ -1,7 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-
-// The external API endpoint
-const EDIT_API_URL = "https://wegenweb.com/api/edit"
+import { API_BASE_URL } from "@/lib/config"
 
 // Set a longer timeout for the API route
 export const maxDuration = 3600 // 60 minutes
@@ -10,6 +8,9 @@ export async function POST(request: NextRequest) {
   try {
     // Get the request body
     const body = await request.json()
+
+    // Get the access token from the request cookies
+    const accessToken = request.cookies.get("access_token")?.value
 
     // Change directory to project_name in the request
     const requestBody = {
@@ -22,11 +23,12 @@ export async function POST(request: NextRequest) {
       delete requestBody.directory
     }
 
-    // Forward the request to the edit API
-    const response = await fetch(EDIT_API_URL, {
+    // Forward the request to the edit API using the environment-specific base URL
+    const response = await fetch(`${API_BASE_URL}/edit`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify(requestBody),
     })

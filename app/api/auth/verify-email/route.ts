@@ -1,5 +1,5 @@
-// Add a route handler for email verification
 import { type NextRequest, NextResponse } from "next/server"
+import { API_BASE_URL } from "@/lib/config"
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,11 +7,11 @@ export async function GET(request: NextRequest) {
     const token = request.nextUrl.searchParams.get("token")
 
     if (!token) {
-      return NextResponse.json({ error: "Token is required" }, { status: 400 })
+      return NextResponse.json({ error: "No token provided" }, { status: 400 })
     }
 
     // Forward the request to the API endpoint
-    const response = await fetch(`https://wegenweb.com/api/auth/verify-email?token=${token}`, {
+    const response = await fetch(`${API_BASE_URL}/auth/verify-email?token=${token}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     // Return the response
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in verify-email API route:", error)
+    console.error("Error in verify email API route:", error)
     return NextResponse.json({ error: `Failed to verify email: ${(error as Error).message}` }, { status: 500 })
   }
 }

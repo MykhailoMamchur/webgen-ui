@@ -107,7 +107,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (retryResponse.ok) {
                 const userData = await retryResponse.json()
                 setUser(userData)
-                setupTokenRefresh()
                 setIsLoading(false)
                 return
               }
@@ -125,9 +124,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const userData = await response.json()
         setUser(userData)
-
-        // Set up token refresh
-        setupTokenRefresh()
       } catch (error) {
         console.error("Authentication error:", error)
         setUser(null)
@@ -149,30 +145,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth()
   }, [pathname, router])
 
-  // Set up token refresh interval
-  const setupTokenRefresh = () => {
-    // Check token expiration every minute
-    const refreshInterval = setInterval(
-      async () => {
-        try {
-          const token = getAuthToken()
-
-          // If token exists and is about to expire (within 5 minutes), refresh it
-          if (token && isTokenExpired(token, 5 * 60)) {
-            // 5 minutes buffer
-            console.log("Token is about to expire, refreshing...")
-            await refreshUserToken()
-          }
-        } catch (error) {
-          console.error("Token refresh check failed:", error)
-        }
-      },
-      60 * 1000, // Check every minute
-    )
-
-    return refreshInterval
-  }
-
   // Login function
   const handleLogin = async (email: string, password: string) => {
     try {
@@ -181,9 +153,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Update user state
       setUser(user)
-
-      // Set up token refresh
-      setupTokenRefresh()
 
       // Show success toast
       toast({
@@ -215,9 +184,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Update user state
       setUser(user)
-
-      // Set up token refresh
-      setupTokenRefresh()
 
       // Show success toast
       toast({

@@ -1,26 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { API_BASE_URL, COOKIE_DOMAIN, useSecureCookies } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the access token from the request cookies
+    // Get the access token from the cookies
     const accessToken = request.cookies.get("access_token")?.value
-    const refreshToken = request.cookies.get("refresh_token")?.value
 
-    // Forward the request to the API endpoint
-    const response = await fetch("https://wegenweb.com/api/auth/logout", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify({
-        refresh_token: refreshToken,
-      }),
-    })
+    // Forward the request to the API endpoint if we have a token
+    if (accessToken) {
+      try {
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+        })
+      } catch (error) {
+        // Log but continue - we still want to clear cookies even if the API call fails
+        console.error("Error calling logout API:", error)
+      }
+    }
 
-    // Create a response
+    // Create the response object
     const apiResponse = NextResponse.json({
-      status: "success",
       message: "Logged out successfully",
     })
 
@@ -29,11 +32,11 @@ export async function POST(request: NextRequest) {
       name: "access_token",
       value: "",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: useSecureCookies,
       sameSite: "lax",
       maxAge: 0, // Expire immediately
       path: "/",
-      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined,
+      domain: COOKIE_DOMAIN,
     })
 
     // Clear the refresh token cookie
@@ -41,11 +44,11 @@ export async function POST(request: NextRequest) {
       name: "refresh_token",
       value: "",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: useSecureCookies,
       sameSite: "lax",
       maxAge: 0, // Expire immediately
       path: "/",
-      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined,
+      domain: COOKIE_DOMAIN,
     })
 
     return apiResponse

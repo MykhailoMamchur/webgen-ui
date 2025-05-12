@@ -1,7 +1,5 @@
 // Authentication API utilities
-
-// Base URL for the wegenweb API
-const API_BASE_URL = "https://wegenweb.com/api"
+import { API_BASE_URL } from "@/lib/config"
 
 // Helper function to get the auth token from cookies
 export const getAuthToken = (): string | null => {
@@ -22,7 +20,7 @@ export const getAuthToken = (): string | null => {
 }
 
 // Helper function to check if a JWT token is expired
-export const isTokenExpired = (token: string, bufferSeconds = 0): boolean => {
+export const isTokenExpired = (token: string): boolean => {
   if (!token) return true
 
   try {
@@ -40,10 +38,10 @@ export const isTokenExpired = (token: string, bufferSeconds = 0): boolean => {
 
     const { exp } = JSON.parse(jsonPayload)
 
-    // Check if the token is expired or will expire within the buffer time
+    // Check if the token is expired
     if (!exp) return false
     const currentTime = Math.floor(Date.now() / 1000)
-    return currentTime >= exp - bufferSeconds // Subtract buffer time from expiration
+    return currentTime >= exp
   } catch (error) {
     console.error("Error checking token expiration:", error)
     return true // If we can't parse the token, assume it's expired

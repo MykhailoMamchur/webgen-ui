@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { API_BASE_URL } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,8 +30,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Forward the request to the API endpoint
-    const response = await fetch("https://wegenweb.com/api/chat/add", {
+    // Forward the request to the API endpoint using the environment-specific base URL
+    const response = await fetch(`${API_BASE_URL}/chat/add`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

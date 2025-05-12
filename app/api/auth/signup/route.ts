@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { API_BASE_URL, COOKIE_DOMAIN, useSecureCookies } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the request to the API endpoint
-    const response = await fetch("https://wegenweb.com/api/auth/signup", {
+    const response = await fetch(`${API_BASE_URL}/auth/signup`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -23,41 +24,56 @@ export async function POST(request: NextRequest) {
       }),
     })
 
-    // If the response is not ok, throw an error
+    // Parse the response data
+    const data = await response.json()
+
+    // If the response is not ok, return the error
     if (!response.ok) {
-      const errorData = await response.json()
       return NextResponse.json(
-        { error: errorData.message || errorData.detail || `Failed to register: ${response.status}` },
+        { error: data.message || data.detail || `Failed to sign up: ${response.status}` },
         { status: response.status },
       )
     }
 
-    // Parse the response data
-    const data = await response.json()
-
-    // Set the auth token in a cookie
-    const response2 = NextResponse.json({
+    // Create the response object
+    const apiResponse = NextResponse.json({
       user: data.user,
-      token: data.token,
-      message: "Registration successful",
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      message: "Signup successful",
     })
 
-    // Set a secure HTTP-only cookie with the token
-    // Expires in 7 days
-    response2.cookies.set({
-      name: "auth_token",
-      value: data.token,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // Changed from strict to lax to allow cross-site requests
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: "/",
-      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined, // Use root domain in production
-    })
+    // Set the access token in a cookie
+    if (data.access_token) {
+      apiResponse.cookies.set({
+        name: "access_token",
+        value: data.access_token,
+        httpOnly: true,
+        secure: useSecureCookies,
+        sameSite: "lax",
+        maxAge: 60 * 60, // 1 hour
+        path: "/",
+        domain: COOKIE_DOMAIN,
+      })
+    }
 
-    return response2
+    // Set the refresh token in a cookie
+    if (data.refresh_token) {
+      apiResponse.cookies.set({
+        name: "refresh_token",
+        value: data.refresh_token,
+        httpOnly: true,
+        secure: useSecureCookies,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: "/",
+        domain: COOKIE_DOMAIN,
+      })
+    }
+
+    return apiResponse
   } catch (error) {
     console.error("Error in signup API route:", error)
-    return NextResponse.json({ error: `Failed to register: ${(error as Error).message}` }, { status: 500 })
+    return NextResponse.json({ error: `Failed to sign up: ${(error as Error).message}` }, { status: 500 })
   }
 }

@@ -1,5 +1,5 @@
-// Create a new file for the project creation API route
 import { type NextRequest, NextResponse } from "next/server"
+import { API_BASE_URL } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,8 +19,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project name is required" }, { status: 400 })
     }
 
-    // Forward the request to the backend API with authentication
-    const response = await fetch("https://wegenweb.com/api/projects/create", {
+    // Forward the request to the backend API with authentication using the environment-specific base URL
+    const response = await fetch(`${API_BASE_URL}/projects/create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

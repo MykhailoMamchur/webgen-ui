@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
-
-// Use a hardcoded API base URL
-const API_BASE_URL = "https://wegenweb.com/api"
+import { API_BASE_URL } from "@/lib/config"
 
 export async function POST(request: Request) {
   try {
@@ -17,7 +15,7 @@ export async function POST(request: Request) {
 
     console.log("Getting all prompts with token:", token.substring(0, 10) + "...")
 
-    // Forward the request to the backend API with the auth token
+    // Forward the request to the backend API with the auth token using the environment-specific base URL
     const response = await fetch(`${API_BASE_URL}/prompts/get_all`, {
       method: "POST",
       headers: {

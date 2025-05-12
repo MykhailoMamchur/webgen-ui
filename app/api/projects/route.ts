@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { API_BASE_URL } from "@/lib/config"
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,8 +11,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ projects: [], authenticated: false })
     }
 
-    // Update the API endpoint to use wegenweb.com/api with authentication
-    const response = await fetch("https://wegenweb.com/api/projects", {
+    // Update the API endpoint to use the environment-specific base URL
+    const response = await fetch(`${API_BASE_URL}/projects`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

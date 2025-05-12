@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { API_BASE_URL, COOKIE_DOMAIN, useSecureCookies } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the request to the API endpoint
-    const response = await fetch("https://wegenweb.com/api/auth/login", {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -47,11 +48,11 @@ export async function POST(request: NextRequest) {
       name: "access_token",
       value: data.access_token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: useSecureCookies,
       sameSite: "lax",
       maxAge: 60 * 60, // 1 hour
       path: "/",
-      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined,
+      domain: COOKIE_DOMAIN,
     })
 
     // Set the refresh token in a cookie
@@ -59,11 +60,11 @@ export async function POST(request: NextRequest) {
       name: "refresh_token",
       value: data.refresh_token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: useSecureCookies,
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: "/",
-      domain: process.env.NODE_ENV === "production" ? ".wegenweb.com" : undefined,
+      domain: COOKIE_DOMAIN,
     })
 
     return apiResponse

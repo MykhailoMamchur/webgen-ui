@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { API_BASE_URL } from "@/lib/config"
 
 // Set a longer timeout for the API route
 export const maxDuration = 3600 // 60 minutes
@@ -37,8 +38,8 @@ export async function POST(request: NextRequest) {
       controller.abort()
     })
 
-    // Update the API endpoint to use wegenweb.com/api
-    const response = await fetch("https://wegenweb.com/api/edit", {
+    // Update the API endpoint to use the environment-specific base URL
+    const response = await fetch(`${API_BASE_URL}/edit`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
       throw new Error(`API responded with status ${response.status}: ${errorText}`)
     }
 
-    // Create a new readable stream
+    // Get the response stream
     const stream = response.body
 
     // If there's no stream, throw an error
@@ -62,33 +63,8 @@ export async function POST(request: NextRequest) {
       throw new Error("No response stream from API")
     }
 
-    // Create a TransformStream to keep the connection alive
-    const keepAliveStream = new TransformStream({
-      start(controller) {
-        // Send a comment every 15 seconds to keep the connection alive
-        const interval = setInterval(() => {
-          try {
-            controller.enqueue(new TextEncoder().encode("\n<!-- keep-alive -->\n"))
-          } catch (e) {
-            clearInterval(interval)
-          }
-        }, 15000)
-
-        // Clean up the interval when the request is aborted
-        request.signal.addEventListener("abort", () => {
-          clearInterval(interval)
-        })
-      },
-      transform(chunk, controller) {
-        controller.enqueue(chunk)
-      },
-    })
-
-    // Pipe the response through the keep-alive stream
-    const transformedStream = stream.pipeThrough(keepAliveStream)
-
-    // Return the stream as the response with appropriate headers
-    return new NextResponse(transformedStream, {
+    // Return the stream directly as the response with appropriate headers
+    return new NextResponse(stream, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Transfer-Encoding": "chunked",

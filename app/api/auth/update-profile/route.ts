@@ -1,24 +1,24 @@
-// Add a route handler for updating user profile
 import { type NextRequest, NextResponse } from "next/server"
+import { API_BASE_URL } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the request body
-    const body = await request.json()
-
-    // Get the access token from the request cookies
+    // Get the access token from the cookies
     const accessToken = request.cookies.get("access_token")?.value
 
     if (!accessToken) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+      return NextResponse.json({ error: "No access token provided" }, { status: 401 })
     }
 
+    // Get the request body
+    const body = await request.json()
+
     // Forward the request to the API endpoint
-    const response = await fetch("https://wegenweb.com/api/auth/update-profile", {
+    const response = await fetch(`${API_BASE_URL}/auth/update-profile`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`, // Ensure proper format with space
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(body),
     })
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     // Return the response
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in update-profile API route:", error)
+    console.error("Error in update profile API route:", error)
     return NextResponse.json({ error: `Failed to update profile: ${(error as Error).message}` }, { status: 500 })
   }
 }

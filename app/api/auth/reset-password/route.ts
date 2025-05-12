@@ -1,5 +1,5 @@
-// Add a route handler for password reset
 import { type NextRequest, NextResponse } from "next/server"
+import { API_BASE_URL } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the request to the API endpoint
-    const response = await fetch("https://wegenweb.com/api/auth/reset-password", {
+    const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     // Return the response
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in reset-password API route:", error)
+    console.error("Error in reset password API route:", error)
     return NextResponse.json({ error: `Failed to reset password: ${(error as Error).message}` }, { status: 500 })
   }
 }
