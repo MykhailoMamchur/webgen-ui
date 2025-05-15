@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the request to the API endpoint using the helper function
-    const response = await fetch(getApiUrl("/api/auth/signup"), {
+    const response = await fetch(getApiUrl("/auth/signup"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Parse the response data
     const data = await response.json()
+    console.log("Signup response data:", JSON.stringify(data, null, 2))
 
     // If the response is not ok, return the error
     if (!response.ok) {
@@ -40,11 +41,13 @@ export async function POST(request: NextRequest) {
       user: data.user,
       access_token: data.access_token,
       refresh_token: data.refresh_token,
+      session_token: data.session_token,
       message: "Signup successful",
     })
 
     // Set the access token in a cookie
     if (data.access_token) {
+      console.log("Setting access_token cookie")
       apiResponse.cookies.set({
         name: "access_token",
         value: data.access_token,
@@ -53,12 +56,15 @@ export async function POST(request: NextRequest) {
         sameSite: "lax",
         maxAge: 60 * 60, // 1 hour
         path: "/",
-        domain: COOKIE_DOMAIN,
+        domain: COOKIE_DOMAIN || undefined,
       })
+    } else {
+      console.error("No access_token in response")
     }
 
     // Set the refresh token in a cookie
     if (data.refresh_token) {
+      console.log("Setting refresh_token cookie")
       apiResponse.cookies.set({
         name: "refresh_token",
         value: data.refresh_token,
@@ -67,7 +73,24 @@ export async function POST(request: NextRequest) {
         sameSite: "lax",
         maxAge: 60 * 60 * 24 * 7, // 7 days
         path: "/",
-        domain: COOKIE_DOMAIN,
+        domain: COOKIE_DOMAIN || undefined,
+      })
+    } else {
+      console.error("No refresh_token in response")
+    }
+
+    // Set session token if available (for compatibility with some systems)
+    if (data.session_token) {
+      console.log("Setting session_token cookie")
+      apiResponse.cookies.set({
+        name: "session_token",
+        value: data.session_token,
+        httpOnly: true,
+        secure: useSecureCookies,
+        sameSite: "lax",
+        maxAge: 60 * 60, // 1 hour
+        path: "/",
+        domain: COOKIE_DOMAIN || undefined,
       })
     }
 

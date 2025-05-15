@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the request to the API endpoint using the helper function
-    const response = await fetch(getApiUrl("/api/auth/login"), {
+    const response = await fetch(getApiUrl("/auth/login"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Parse the response data
     const data = await response.json()
+    console.log("Login response data:", JSON.stringify(data, null, 2))
 
     // Create the response object
     const apiResponse = NextResponse.json({
@@ -44,28 +45,53 @@ export async function POST(request: NextRequest) {
     })
 
     // Set the access token in a cookie
-    apiResponse.cookies.set({
-      name: "access_token",
-      value: data.access_token,
-      httpOnly: true,
-      secure: useSecureCookies,
-      sameSite: "lax",
-      maxAge: 60 * 60, // 1 hour
-      path: "/",
-      domain: COOKIE_DOMAIN,
-    })
+    if (data.access_token) {
+      console.log("Setting access_token cookie")
+      apiResponse.cookies.set({
+        name: "access_token",
+        value: data.access_token,
+        httpOnly: true,
+        secure: useSecureCookies,
+        sameSite: "lax",
+        maxAge: 60 * 60, // 1 hour
+        path: "/",
+        domain: COOKIE_DOMAIN || undefined,
+      })
+    } else {
+      console.error("No access_token in response")
+    }
 
     // Set the refresh token in a cookie
-    apiResponse.cookies.set({
-      name: "refresh_token",
-      value: data.refresh_token,
-      httpOnly: true,
-      secure: useSecureCookies,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: "/",
-      domain: COOKIE_DOMAIN,
-    })
+    if (data.refresh_token) {
+      console.log("Setting refresh_token cookie")
+      apiResponse.cookies.set({
+        name: "refresh_token",
+        value: data.refresh_token,
+        httpOnly: true,
+        secure: useSecureCookies,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: "/",
+        domain: COOKIE_DOMAIN || undefined,
+      })
+    } else {
+      console.error("No refresh_token in response")
+    }
+
+    // Set session token if available (for compatibility with some systems)
+    if (data.session_token) {
+      console.log("Setting session_token cookie")
+      apiResponse.cookies.set({
+        name: "session_token",
+        value: data.session_token,
+        httpOnly: true,
+        secure: useSecureCookies,
+        sameSite: "lax",
+        maxAge: 60 * 60, // 1 hour
+        path: "/",
+        domain: COOKIE_DOMAIN || undefined,
+      })
+    }
 
     return apiResponse
   } catch (error) {

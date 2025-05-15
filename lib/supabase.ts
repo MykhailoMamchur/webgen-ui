@@ -2,8 +2,8 @@ import { createClient } from "@supabase/supabase-js"
 import { API_BASE_URL } from "./config"
 
 // Extract the Supabase URL and anon key from environment or config
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ayhyqgzeiuyaymtorteg.supabase.co"
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5aHlxZ3plaXV5YXltdG9ydGVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2NTYxODIsImV4cCI6MjA2MDIzMjE4Mn0.bCpMxdkJS70InbMcjFUB_JCmawNaJ8QYvyu3EVZ_eUg"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://your-project.supabase.co"
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "your-anon-key"
 
 // Create a single supabase client for interacting with your database
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
