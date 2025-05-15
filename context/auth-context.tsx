@@ -54,7 +54,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           pathname === "/login" ||
           pathname === "/reset-password" ||
           pathname === "/verify-email" ||
-          pathname === "/auth/callback"
+          pathname === "/auth/callback" ||
+          pathname === "/resend-verification"
         ) {
           setUser(null)
           setSession(null)
@@ -64,26 +65,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Get the current session
         const currentSession = await getSession()
+        console.log("Current session:", currentSession ? "exists" : "null")
+
         setSession(currentSession)
 
         if (currentSession) {
           // Get the current user
           const currentUser = await getUser()
+          console.log("Current user:", currentUser ? "exists" : "null")
+
           setUser(currentUser as User)
         } else {
-          // If no session, redirect to login
+          // Check for traditional cookies as fallback
+          const hasAccessToken = document.cookie.includes("access_token=") || document.cookie.includes("session_token=")
+
+          console.log("Has access token cookie:", hasAccessToken)
+
+          if (hasAccessToken) {
+            // Try to get user data with the token
+            try {
+              const response = await fetch("/api/auth/me", {
+                method: "GET",
+                credentials: "include",
+              })
+
+              if (response.ok) {
+                const userData = await response.json()
+                console.log("User data from API:", userData)
+                setUser(userData as User)
+                // Don't redirect in this case
+                setIsLoading(false)
+                return
+              }
+            } catch (error) {
+              console.error("Error fetching user data with token:", error)
+            }
+          }
+
+          // If no session or token, redirect to login
           setUser(null)
 
           // Redirect to login page if not on an auth page
-          if (
-            pathname !== "/signup" &&
-            pathname !== "/login" &&
-            pathname !== "/reset-password" &&
-            pathname !== "/verify-email" &&
-            pathname !== "/auth/callback"
-          ) {
-            router.push("/login")
-          }
+          console.log("No session, redirecting to login")
+          router.push("/login")
         }
       } catch (error) {
         console.error("Authentication error:", error)
@@ -96,7 +120,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           pathname !== "/login" &&
           pathname !== "/reset-password" &&
           pathname !== "/verify-email" &&
-          pathname !== "/auth/callback"
+          pathname !== "/auth/callback" &&
+          pathname !== "/resend-verification"
         ) {
           router.push("/login")
         }
@@ -143,7 +168,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
 
       // Redirect to home page or intended destination
-      router.push("/")
+      setTimeout(() => {
+        router.push("/")
+      }, 500) // Short delay to ensure cookies are set
     } catch (error: any) {
       console.error("Login error:", error)
       toast({
@@ -293,7 +320,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     session,
     isLoading,
-    isAuthenticated: !!user && !!session,
+    isAuthenticated: !!user || !!session, // Consider authenticated if either user or session exists
     login: handleLogin,
     signup: handleSignup,
     logout: handleLogout,

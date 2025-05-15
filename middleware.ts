@@ -9,7 +9,9 @@ export async function middleware(request: NextRequest) {
 
   // Refresh session if expired - required for Server Components
   // https://supabase.com/docs/guides/auth/auth-helpers/nextjs#managing-session-with-middleware
-  await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
   // Get the pathname of the request
   const path = request.nextUrl.pathname
@@ -33,11 +35,14 @@ export async function middleware(request: NextRequest) {
     path === "/auth/callback" ||
     isPublicApiPath // Only specific API routes are public
 
-  // Get the session
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  const isAuthenticated = !!session
+  // Check for traditional cookies as fallback
+  const hasAccessToken = request.cookies.has("access_token") || request.cookies.has("session_token")
+  const isAuthenticated = !!session || hasAccessToken
+
+  // Debug logging
+  console.log(
+    `Path: ${path}, isAuthenticated: ${isAuthenticated}, hasAccessToken: ${hasAccessToken}, hasSession: ${!!session}`,
+  )
 
   // Only redirect authenticated users away from public routes
   if (isAuthenticated && isPublicPath) {
