@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Forward the request to the API endpoint using the helper function
-    const response = await fetch(getApiUrl("/api/prompts/get_all"), {
+    const response = await fetch(getApiUrl("/prompts/get_all"), {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
