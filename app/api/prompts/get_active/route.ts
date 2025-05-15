@@ -1,37 +1,54 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getApiUrl } from "@/lib/config"
+import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
+import { API_BASE_URL } from "@/lib/config"
 
-export async function GET(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    // Get the access token from the request cookies
-    const accessToken = request.cookies.get("access_token")?.value
+    // Get the auth token from cookies
+    const cookieStore = cookies()
+    const token = cookieStore.get("access_token")?.value
 
-    if (!accessToken) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    if (!token) {
+      console.error("No authentication token found in cookies")
+      return NextResponse.json({ status: "error", error: "Authentication required" }, { status: 401 })
     }
 
-    // Forward the request to the API endpoint using the helper function
-    const response = await fetch(getApiUrl("/api/prompts/get_active"), {
-      method: "GET",
+    console.log("Getting active prompt with token:", token.substring(0, 10) + "...")
+
+    // Forward the request to the backend API with the auth token using the environment-specific base URL
+    const response = await fetch(`${API_BASE_URL}/prompts/get_active`, {
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
       },
     })
 
-    // If the response is not ok, throw an error
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`API responded with status ${response.status}: ${errorText}`)
+    console.log("API response status:", response.status)
+
+    // Log the response body for debugging
+    const responseText = await response.text()
+    console.log("API response body:", responseText)
+
+    // Parse the response as JSON
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (e) {
+      console.error("Error parsing JSON response:", e)
+      return NextResponse.json({ status: "error", error: "Invalid response from server" }, { status: 500 })
     }
 
-    // Parse the response data
-    const data = await response.json()
+    if (!response.ok) {
+      return NextResponse.json(
+        { status: "error", error: data.error || "Failed to get active prompt" },
+        { status: response.status },
+      )
+    }
 
-    // Return the active prompts data
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in prompts/get_active API route:", error)
-    return NextResponse.json({ error: `Failed to get active prompts: ${(error as Error).message}` }, { status: 500 })
+    console.error("Error getting active prompt:", error)
+    return NextResponse.json({ status: "error", error: "Internal server error" }, { status: 500 })
   }
 }

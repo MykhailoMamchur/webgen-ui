@@ -1,21 +1,22 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getApiUrl } from "@/lib/config"
+import { API_BASE_URL } from "@/lib/config"
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the access token from the request cookies
-    const accessToken = request.cookies.get("access_token")?.value
+    // Get the auth token from the request cookies
+    const token = request.cookies.get("access_token")?.value
 
-    if (!accessToken) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    // If no token, return an empty projects array instead of an error
+    if (!token) {
+      return NextResponse.json({ projects: [], authenticated: false })
     }
 
-    // Forward the request to the API endpoint using the helper function
-    const response = await fetch(getApiUrl("/api/projects"), {
+    // Update the API endpoint to use the environment-specific base URL
+    const response = await fetch(`${API_BASE_URL}/projects`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`, // Ensure proper format with space after Bearer
       },
     })
 
@@ -25,13 +26,15 @@ export async function GET(request: NextRequest) {
       throw new Error(`API responded with status ${response.status}: ${errorText}`)
     }
 
-    // Parse the response data
+    // Return the response directly
     const data = await response.json()
-
-    // Return the projects data
-    return NextResponse.json(data)
+    return NextResponse.json({ ...data, authenticated: true })
   } catch (error) {
     console.error("Error in projects API route:", error)
-    return NextResponse.json({ error: `Failed to get projects: ${(error as Error).message}` }, { status: 500 })
+    // Return empty projects array instead of error status
+    return NextResponse.json(
+      { error: `Failed to fetch projects: ${(error as Error).message}`, projects: [], authenticated: false },
+      { status: 200 }, // Return 200 instead of 500 to handle gracefully
+    )
   }
 }

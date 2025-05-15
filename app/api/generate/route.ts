@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getApiUrl } from "@/lib/config"
+import { API_BASE_URL } from "@/lib/config"
 
 // Set a longer timeout for the API route
 export const maxDuration = 3600 // 60 minutes
@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
       delete requestBody.directory
     }
 
-    // Forward the request to the edit API using the helper function
-    const response = await fetch(getApiUrl("/api/edit"), {
+    // Forward the request to the edit API using the environment-specific base URL
+    const response = await fetch(`${API_BASE_URL}/edit`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -47,8 +47,28 @@ export async function POST(request: NextRequest) {
       throw new Error("No response stream from API")
     }
 
+    // Create a TransformStream to keep the connection alive
+    const keepAliveStream = new TransformStream({
+      start(controller) {
+        // Send a comment every 15 seconds to keep the connection alive
+        const interval = setInterval(() => {
+          try {
+            controller.enqueue(new TextEncoder().encode("\n<!-- keep-alive -->\n"))
+          } catch (e) {
+            clearInterval(interval)
+          }
+        }, 15000)
+      },
+      transform(chunk, controller) {
+        controller.enqueue(chunk)
+      },
+    })
+
+    // Pipe the response through the keep-alive stream
+    const transformedStream = stream.pipeThrough(keepAliveStream)
+
     // Return the stream as the response with appropriate headers
-    return new NextResponse(stream, {
+    return new NextResponse(transformedStream, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Transfer-Encoding": "chunked",

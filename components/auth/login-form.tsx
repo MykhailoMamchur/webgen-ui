@@ -5,13 +5,11 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Loader2 } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
 
 // Form validation schema
 const loginSchema = z.object({
@@ -24,7 +22,6 @@ type LoginFormValues = z.infer<typeof loginSchema>
 export function LoginForm() {
   const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
 
   // Initialize form
   const form = useForm<LoginFormValues>({
@@ -39,47 +36,12 @@ export function LoginForm() {
   const onSubmit = async (values: LoginFormValues) => {
     try {
       setIsLoading(true)
-
-      // Call the login API directly
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: values.email,
-          password: values.password,
-        }),
-        credentials: "include", // Important: include cookies in the request
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Login failed")
-      }
-
-      const data = await response.json()
-
-      // Show success toast
-      toast({
-        title: "Login successful",
-        description: "Welcome back!",
-        variant: "success",
-      })
-
-      // Redirect to home page after a short delay to allow cookies to be set
-      setTimeout(() => {
-        router.push("/")
-        router.refresh() // Force a refresh to update the UI with the new auth state
-      }, 500)
+      await login(values.email, values.password)
     } catch (error: any) {
+      // Error is handled in the auth context, but we can add specific handling here if needed
       console.error("Login error:", error)
-      toast({
-        title: "Login failed",
-        description: error.message || "Invalid email or password",
-        variant: "error",
-      })
-    } finally {
+
+      // Form is already reset by the auth context on success
       setIsLoading(false)
     }
   }

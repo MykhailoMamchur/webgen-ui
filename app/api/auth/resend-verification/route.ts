@@ -1,43 +1,36 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getApiUrl } from "@/lib/config"
+import { getApiBaseUrl } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the request body
     const body = await request.json()
+    const { email } = body
 
-    // Ensure email is provided
-    if (!body.email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 })
+    if (!email) {
+      return NextResponse.json({ message: "Email is required" }, { status: 400 })
     }
 
-    // Forward the request to the API endpoint using the helper function
-    const response = await fetch(getApiUrl("/api/auth/resend-verification"), {
+    // Call the backend API to resend verification email
+    const response = await fetch(`${getApiBaseUrl()}/auth/resend-verification`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        email: body.email,
-      }),
+      body: JSON.stringify({ email }),
     })
 
-    // If the response is not ok, throw an error
     if (!response.ok) {
       const errorData = await response.json()
       return NextResponse.json(
-        { error: errorData.message || errorData.detail || `Failed to resend verification: ${response.status}` },
+        { message: errorData.message || "Failed to resend verification email" },
         { status: response.status },
       )
     }
 
-    // Parse the response data
     const data = await response.json()
-
-    // Return the response
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in resend-verification API route:", error)
-    return NextResponse.json({ error: `Failed to resend verification: ${(error as Error).message}` }, { status: 500 })
+    console.error("Error resending verification email:", error)
+    return NextResponse.json({ message: "An error occurred while resending verification email" }, { status: 500 })
   }
 }

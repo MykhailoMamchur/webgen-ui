@@ -52,9 +52,8 @@ export default function PromptsModal({ isOpen, onClose }: PromptsModalProps) {
     try {
       setLoading(true)
 
-      // Changed from POST to GET
       const response = await fetch("/api/prompts/get_all", {
-        method: "GET",
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },

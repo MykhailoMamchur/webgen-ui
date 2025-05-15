@@ -5,14 +5,12 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Loader2, CheckCircle, Mail } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
-import { toast } from "@/components/ui/use-toast"
 
 // Form validation schema
 const signupSchema = z
@@ -38,7 +36,6 @@ export function SignupForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [userEmail, setUserEmail] = useState("")
-  const router = useRouter()
 
   // Initialize form
   const form = useForm<SignupFormValues>({
@@ -54,53 +51,14 @@ export function SignupForm() {
   const onSubmit = async (values: SignupFormValues) => {
     try {
       setIsLoading(true)
-
-      // Call the signup API directly
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: values.email,
-          password: values.password,
-          password_confirm: values.confirmPassword,
-        }),
-        credentials: "include", // Important: include cookies in the request
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Signup failed")
-      }
-
-      const data = await response.json()
-
+      await signup(values.email, values.password, values.confirmPassword)
       setUserEmail(values.email)
       setIsSuccess(true)
-
-      // Show success toast
-      toast({
-        title: "Registration successful",
-        description: "Your account has been created successfully!",
-        variant: "success",
-      })
-
-      // If email verification is not required, redirect to home page after a short delay
-      if (!isSuccess) {
-        setTimeout(() => {
-          router.push("/")
-          router.refresh() // Force a refresh to update the UI with the new auth state
-        }, 500)
-      }
     } catch (error: any) {
+      // Error is handled in the auth context, but we can add specific handling here if needed
       console.error("Signup error:", error)
-      toast({
-        title: "Registration failed",
-        description: error.message || "Could not create your account",
-        variant: "error",
-      })
-    } finally {
+
+      // Form is already reset by the auth context on success
       setIsLoading(false)
     }
   }
