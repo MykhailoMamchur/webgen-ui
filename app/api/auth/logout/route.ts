@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { API_BASE_URL, COOKIE_DOMAIN, useSecureCookies } from "@/lib/config"
+import { getApiUrl, COOKIE_DOMAIN, useSecureCookies } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     // Forward the request to the API endpoint if we have a token
     if (accessToken) {
       try {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
+        await fetch(getApiUrl("/api/auth/logout"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

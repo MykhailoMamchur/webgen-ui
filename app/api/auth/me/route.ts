@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { API_BASE_URL } from "@/lib/config"
+import { getApiUrl } from "@/lib/config"
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,8 +11,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No access token provided" }, { status: 401 })
     }
 
-    // Forward the request to the API endpoint
-    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+    // Forward the request to the API endpoint using the helper function
+    const response = await fetch(getApiUrl("/api/auth/me"), {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

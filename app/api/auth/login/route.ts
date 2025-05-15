@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { API_BASE_URL, COOKIE_DOMAIN, useSecureCookies } from "@/lib/config"
+import { getApiUrl, COOKIE_DOMAIN, useSecureCookies } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,8 +11,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
     }
 
-    // Forward the request to the API endpoint
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    // Forward the request to the API endpoint using the helper function
+    const response = await fetch(getApiUrl("/api/auth/login"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

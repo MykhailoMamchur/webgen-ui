@@ -1,22 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { API_BASE_URL } from "@/lib/config"
+import { getApiUrl } from "@/lib/config"
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the auth token from the request cookies
-    const token = request.cookies.get("access_token")?.value
+    // Get the access token from the request cookies
+    const accessToken = request.cookies.get("access_token")?.value
 
-    // If no token, return an empty projects array instead of an error
-    if (!token) {
-      return NextResponse.json({ projects: [], authenticated: false })
+    if (!accessToken) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    // Update the API endpoint to use the environment-specific base URL
-    const response = await fetch(`${API_BASE_URL}/projects`, {
+    // Forward the request to the API endpoint using the helper function
+    const response = await fetch(getApiUrl("/api/projects"), {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`, // Ensure proper format with space after Bearer
+        Authorization: `Bearer ${accessToken}`,
       },
     })
 
@@ -26,15 +25,13 @@ export async function GET(request: NextRequest) {
       throw new Error(`API responded with status ${response.status}: ${errorText}`)
     }
 
-    // Return the response directly
+    // Parse the response data
     const data = await response.json()
-    return NextResponse.json({ ...data, authenticated: true })
+
+    // Return the projects data
+    return NextResponse.json(data)
   } catch (error) {
     console.error("Error in projects API route:", error)
-    // Return empty projects array instead of error status
-    return NextResponse.json(
-      { error: `Failed to fetch projects: ${(error as Error).message}`, projects: [], authenticated: false },
-      { status: 200 }, // Return 200 instead of 500 to handle gracefully
-    )
+    return NextResponse.json({ error: `Failed to get projects: ${(error as Error).message}` }, { status: 500 })
   }
 }

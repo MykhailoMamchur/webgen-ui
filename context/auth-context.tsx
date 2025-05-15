@@ -4,61 +4,47 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
+import type { User as SupabaseUser, Session } from "@supabase/supabase-js"
 import {
-  loginUser,
-  registerUser,
-  logoutUser,
+  supabase,
+  signInWithEmail,
+  signUpWithEmail,
+  signOut,
   resetPassword,
-  refreshToken,
-  isTokenExpired,
-  getAuthToken,
-  getCurrentUser,
-} from "@/lib/auth"
+  getUser,
+  getSession,
+  updateProfile,
+} from "@/lib/supabase"
 
-// Update the User interface to match the API response
-export interface User {
-  id: string
-  email: string
-  created_at?: string
+// Update the User interface to match Supabase User
+export interface User extends SupabaseUser {
   name?: string
-  emailVerified?: boolean
-  updatedAt?: string
 }
 
 interface AuthContextType {
   user: User | null
+  session: Session | null
   isLoading: boolean
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, password: string, passwordConfirm: string) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
-  updateUser: (user: Partial<User>) => void
-  refreshUserToken: () => Promise<boolean>
+  updateUser: (user: Partial<User>) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const router = useRouter()
   const pathname = usePathname()
 
-  // Function to refresh the token
-  const refreshUserToken = async (): Promise<boolean> => {
-    try {
-      await refreshToken()
-      return true
-    } catch (error) {
-      console.error("Token refresh failed:", error)
-      return false
-    }
-  }
-
-  // Check if user is authenticated on initial load
+  // Initialize auth state
   useEffect(() => {
-    const checkAuth = async () => {
+    const initAuth = async () => {
       try {
         setIsLoading(true)
 
@@ -67,81 +53,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           pathname === "/signup" ||
           pathname === "/login" ||
           pathname === "/reset-password" ||
-          pathname === "/verify-email"
+          pathname === "/verify-email" ||
+          pathname === "/auth/callback"
         ) {
           setUser(null)
+          setSession(null)
           setIsLoading(false)
           return
         }
 
-        // Check if token exists and is expired
-        const token = getAuthToken()
-        if (token && isTokenExpired(token)) {
-          // Try to refresh the token
-          const refreshed = await refreshUserToken()
-          if (!refreshed) {
-            // If refresh fails, redirect to login
-            setUser(null)
-            router.push("/login")
-            setIsLoading(false)
-            return
-          }
-        }
+        // Get the current session
+        const currentSession = await getSession()
+        setSession(currentSession)
 
-        // Try to get current user with the token using our local API route
-        try {
-          const userData = await getCurrentUser()
-          setUser(userData)
-        } catch (error) {
-          // If 401 Unauthorized, try to refresh the token
-          console.error("Failed to get user data:", error)
+        if (currentSession) {
+          // Get the current user
+          const currentUser = await getUser()
+          setUser(currentUser as User)
+        } else {
+          // If no session, redirect to login
+          setUser(null)
 
-          const refreshed = await refreshUserToken()
-          if (refreshed) {
-            // If refresh succeeds, try to get user data again
-            try {
-              const userData = await getCurrentUser()
-              setUser(userData)
-            } catch (retryError) {
-              console.error("Failed to get user data after token refresh:", retryError)
-              setUser(null)
-              router.push("/login")
-            }
-          } else {
-            // If refresh fails, redirect to login
-            setUser(null)
+          // Redirect to login page if not on an auth page
+          if (
+            pathname !== "/signup" &&
+            pathname !== "/login" &&
+            pathname !== "/reset-password" &&
+            pathname !== "/verify-email" &&
+            pathname !== "/auth/callback"
+          ) {
             router.push("/login")
           }
         }
       } catch (error) {
         console.error("Authentication error:", error)
         setUser(null)
+        setSession(null)
 
-        // Redirect to signup page if not on an auth page
+        // Redirect to login page if not on an auth page
         if (
           pathname !== "/signup" &&
           pathname !== "/login" &&
           pathname !== "/reset-password" &&
-          pathname !== "/verify-email"
+          pathname !== "/verify-email" &&
+          pathname !== "/auth/callback"
         ) {
-          router.push("/signup")
+          router.push("/login")
         }
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkAuth()
+    initAuth()
+
+    // Set up auth state change listener
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log(`Auth state changed: ${event}`)
+      setSession(newSession)
+
+      if (newSession) {
+        const newUser = await getUser()
+        setUser(newUser as User)
+      } else {
+        setUser(null)
+      }
+    })
+
+    // Clean up the subscription
+    return () => {
+      authListener.subscription.unsubscribe()
+    }
   }, [pathname, router])
 
   // Login function
   const handleLogin = async (email: string, password: string) => {
     try {
       setIsLoading(true)
-      const { user, access_token, refresh_token } = await loginUser(email, password)
+      const { session, user } = await signInWithEmail(email, password)
 
-      // Update user state
-      setUser(user)
+      setSession(session)
+      setUser(user as User)
 
       // Show success toast
       toast({
@@ -165,24 +157,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Signup function - Updated to match backend expectations
+  // Signup function
   const handleSignup = async (email: string, password: string, passwordConfirm: string) => {
     try {
       setIsLoading(true)
-      const { user, access_token, refresh_token } = await registerUser(email, password, passwordConfirm)
 
-      // Update user state
-      setUser(user)
+      // Validate password confirmation
+      if (password !== passwordConfirm) {
+        throw new Error("Passwords do not match")
+      }
 
-      // Show success toast
+      const { user, session } = await signUpWithEmail(email, password)
+
+      // Show success toast and redirect to verification page
       toast({
         title: "Registration successful",
-        description: "Your account has been created successfully!",
+        description: "Please check your email to verify your account.",
         variant: "success",
       })
 
-      // Redirect to home page instead of verification page
-      router.push("/")
+      // Redirect to a verification page
+      router.push("/verify-email")
     } catch (error: any) {
       console.error("Signup error:", error)
       toast({
@@ -200,10 +195,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     try {
       setIsLoading(true)
-      await logoutUser()
+      await signOut()
 
-      // Update user state
+      // Update state
       setUser(null)
+      setSession(null)
 
       // Show success toast
       toast({
@@ -255,23 +251,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Update user function
-  const updateUser = (updatedUserData: Partial<User>) => {
-    if (user) {
-      setUser({ ...user, ...updatedUserData })
+  const handleUpdateUser = async (updatedUserData: Partial<User>) => {
+    try {
+      setIsLoading(true)
+
+      // Extract email and other data
+      const { email, ...userData } = updatedUserData
+
+      // Prepare update object
+      const updates: { email?: string; data?: any } = {}
+      if (email) updates.email = email
+      if (Object.keys(userData).length > 0) updates.data = userData
+
+      // Update the user profile
+      const { user: updatedUser } = await updateProfile(updates)
+
+      // Update local state
+      setUser(updatedUser as User)
+
+      // Show success toast
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully",
+        variant: "success",
+      })
+    } catch (error: any) {
+      console.error("Update user error:", error)
+      toast({
+        title: "Update failed",
+        description: error.message || "Could not update your profile",
+        variant: "error",
+      })
+      throw error
+    } finally {
+      setIsLoading(false)
     }
   }
 
   // Create context value
   const contextValue: AuthContextType = {
     user,
+    session,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !!session,
     login: handleLogin,
     signup: handleSignup,
     logout: handleLogout,
     resetPassword: handleResetPassword,
-    updateUser,
-    refreshUserToken,
+    updateUser: handleUpdateUser,
   }
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>

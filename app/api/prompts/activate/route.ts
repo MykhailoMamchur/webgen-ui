@@ -1,66 +1,49 @@
-import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { API_BASE_URL } from "@/lib/config"
+import { type NextRequest, NextResponse } from "next/server"
+import { getApiUrl } from "@/lib/config"
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    // Get the auth token from cookies
-    const cookieStore = cookies()
-    const token = cookieStore.get("access_token")?.value
-
-    if (!token) {
-      console.error("No authentication token found in cookies")
-      return NextResponse.json({ status: "error", error: "Authentication required" }, { status: 401 })
-    }
-
-    // Get request body
+    // Get the request body
     const body = await request.json()
-    const { prompt_id } = body
 
-    if (!prompt_id) {
-      return NextResponse.json({ status: "error", error: "Prompt ID is required" }, { status: 400 })
+    // Get the access token from the request cookies
+    const accessToken = request.cookies.get("access_token")?.value
+
+    if (!accessToken) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    console.log("Activating prompt with token:", token.substring(0, 10) + "...")
-    console.log("Request body:", { prompt_id })
+    // Ensure prompt ID is provided
+    if (!body.id) {
+      return NextResponse.json({ error: "Prompt ID is required" }, { status: 400 })
+    }
 
-    // Forward the request to the backend API with the auth token using the environment-specific base URL
-    const response = await fetch(`${API_BASE_URL}/prompts/activate`, {
+    // Forward the request to the API endpoint using the helper function
+    const response = await fetch(getApiUrl("/api/prompts/activate"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        prompt_id,
+        id: body.id,
+        is_active: body.is_active,
       }),
     })
 
-    console.log("API response status:", response.status)
-
-    // Log the response body for debugging
-    const responseText = await response.text()
-    console.log("API response body:", responseText)
-
-    // Parse the response as JSON
-    let data
-    try {
-      data = JSON.parse(responseText)
-    } catch (e) {
-      console.error("Error parsing JSON response:", e)
-      return NextResponse.json({ status: "error", error: "Invalid response from server" }, { status: 500 })
-    }
-
+    // If the response is not ok, throw an error
     if (!response.ok) {
-      return NextResponse.json(
-        { status: "error", error: data.error || "Failed to activate prompt" },
-        { status: response.status },
-      )
+      const errorText = await response.text()
+      throw new Error(`API responded with status ${response.status}: ${errorText}`)
     }
 
+    // Parse the response data
+    const data = await response.json()
+
+    // Return the response data
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error activating prompt:", error)
-    return NextResponse.json({ status: "error", error: "Internal server error" }, { status: 500 })
+    console.error("Error in prompts/activate API route:", error)
+    return NextResponse.json({ error: `Failed to activate prompt: ${(error as Error).message}` }, { status: 500 })
   }
 }

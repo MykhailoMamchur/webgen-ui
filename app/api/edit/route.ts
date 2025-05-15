@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { API_BASE_URL } from "@/lib/config"
+import { getApiUrl } from "@/lib/config"
 
 // Set a longer timeout for the API route
 export const maxDuration = 3600 // 60 minutes
@@ -38,8 +38,8 @@ export async function POST(request: NextRequest) {
       controller.abort()
     })
 
-    // Update the API endpoint to use the environment-specific base URL
-    const response = await fetch(`${API_BASE_URL}/edit`, {
+    // Update the API endpoint to use the helper function
+    const response = await fetch(getApiUrl("/api/edit"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
