@@ -8,10 +8,10 @@ const isProduction = process.env.NODE_ENV === "production"
 
 // Set the API base URL based on the environment
 // Note: We're removing the "/api" suffix from the base URL to avoid duplication
-export const API_BASE_URL = isProduction ? "https://usemanufactura.com" : "http://0.0.0.0:8000"
+export const API_BASE_URL = isProduction ? "https://wegenweb.com" : "http://0.0.0.0:8000"
 
 // Cookie settings based on environment
-export const COOKIE_DOMAIN = isProduction ? ".usemanufactura.com" : undefined
+export const COOKIE_DOMAIN = isProduction ? ".wegenweb.com" : undefined
 export const useSecureCookies = isProduction
 
 // Log the environment and API base URL during startup
