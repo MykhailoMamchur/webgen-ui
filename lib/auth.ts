@@ -1,5 +1,4 @@
-// Authentication API utilities
-import { API_BASE_URL } from "@/lib/config"
+import { apiPost, apiGet } from "./api-client"
 
 // Helper function to get the auth token from cookies
 export const getAuthToken = (): string | null => {
@@ -46,98 +45,6 @@ export const isTokenExpired = (token: string): boolean => {
     console.error("Error checking token expiration:", error)
     return true // If we can't parse the token, assume it's expired
   }
-}
-
-// Helper function to make authenticated API requests with token refresh
-export async function authFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
-  let token = getAuthToken()
-  const url = `${API_BASE_URL}${endpoint}`
-
-  // Check if token is expired and try to refresh it
-  if (token && isTokenExpired(token)) {
-    try {
-      await refreshToken()
-      // Get the new token after refresh
-      token = getAuthToken()
-    } catch (error) {
-      console.error("Failed to refresh token:", error)
-      // If refresh fails, clear the token and throw an error
-      throw new Error("Authentication expired. Please log in again.")
-    }
-  }
-
-  const headers = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}), // Ensure proper Bearer format with space
-    ...options.headers,
-  }
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      credentials: "include", // Include cookies in cross-origin requests
-    })
-
-    // Handle 401 Unauthorized - try to refresh token and retry
-    if (response.status === 401) {
-      try {
-        await refreshToken()
-        // Get the new token after refresh
-        const newToken = getAuthToken()
-
-        // If token refresh was successful, retry the request
-        if (newToken) {
-          const newHeaders = {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${newToken}`,
-            ...options.headers,
-          }
-
-          const retryResponse = await fetch(url, {
-            ...options,
-            headers: newHeaders,
-            credentials: "include",
-          })
-
-          // Handle the retry response
-          return handleResponse(retryResponse)
-        }
-      } catch (refreshError) {
-        console.error("Token refresh failed:", refreshError)
-        throw new Error("Authentication expired. Please log in again.")
-      }
-    }
-
-    // Handle normal response
-    return handleResponse(response)
-  } catch (error) {
-    console.error("API request failed:", error)
-    throw error
-  }
-}
-
-// Helper function to handle API responses
-async function handleResponse(response: Response) {
-  // Handle non-JSON responses
-  const contentType = response.headers.get("content-type")
-  if (contentType && contentType.includes("application/json")) {
-    const data = await response.json()
-
-    // If the response is not ok, throw an error with the response data
-    if (!response.ok) {
-      throw new Error(data.message || data.detail || "An error occurred")
-    }
-
-    return data
-  }
-
-  // For non-JSON responses
-  if (!response.ok) {
-    throw new Error("An error occurred")
-  }
-
-  return response
 }
 
 // Login user
@@ -223,23 +130,7 @@ export async function resetPassword(email: string) {
 
 // Get current user
 export async function getCurrentUser() {
-  // Use our local API route instead of direct fetch
-  const token = getAuthToken()
-  const response = await fetch("/api/auth/me", {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    credentials: "include", // Include cookies in the request
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json()
-    throw new Error(errorData.error || errorData.message || "Authentication failed")
-  }
-
-  return await response.json()
+  return apiGet("/api/auth/me")
 }
 
 // Refresh token
@@ -288,19 +179,5 @@ export async function updateUserProfile(userData: {
   currentPassword?: string
   newPassword?: string
 }) {
-  const response = await fetch("/api/auth/update-profile", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(userData),
-    credentials: "include", // Include cookies in the request
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json()
-    throw new Error(errorData.error || errorData.message || "Failed to update profile")
-  }
-
-  return await response.json()
+  return apiPost("/api/auth/update-profile", userData)
 }

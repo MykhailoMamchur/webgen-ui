@@ -16,3 +16,5 @@ export const useSecureCookies = isProduction
 // Log the environment and API base URL during startup
 console.log(`Environment: ${isProduction ? "Production" : "Development"}`)
 console.log(`API Base URL: ${API_BASE_URL}`)
+
+export const getApiBaseUrl = () => API_BASE_URL

@@ -5,60 +5,62 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Link from "next/link"
-import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Loader2, CheckCircle, Mail } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
+import { toast } from "@/components/ui/use-toast"
 
 // Form validation schema
-const signupSchema = z
-  .object({
-    email: z.string().email({ message: "Please enter a valid email address" }),
-    password: z
-      .string()
-      .min(8, { message: "Password must be at least 8 characters" })
-      .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" })
-      .regex(/[a-z]/, { message: "Password must contain at least one lowercase letter" })
-      .regex(/[0-9]/, { message: "Password must contain at least one number" }),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  })
+const resendSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
+})
 
-type SignupFormValues = z.infer<typeof signupSchema>
+type ResendFormValues = z.infer<typeof resendSchema>
 
-export function SignupForm() {
-  const { signup } = useAuth()
+export function ResendVerificationForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [userEmail, setUserEmail] = useState("")
 
   // Initialize form
-  const form = useForm<SignupFormValues>({
-    resolver: zodResolver(signupSchema),
+  const form = useForm<ResendFormValues>({
+    resolver: zodResolver(resendSchema),
     defaultValues: {
       email: "",
-      password: "",
-      confirmPassword: "",
     },
   })
 
   // Form submission handler
-  const onSubmit = async (values: SignupFormValues) => {
+  const onSubmit = async (values: ResendFormValues) => {
     try {
       setIsLoading(true)
-      await signup(values.email, values.password, values.confirmPassword)
+
+      // Call the API to resend verification email
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: values.email }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || "Failed to resend verification email")
+      }
+
       setUserEmail(values.email)
       setIsSuccess(true)
     } catch (error: any) {
-      // Error is handled in the auth context, but we can add specific handling here if needed
-      console.error("Signup error:", error)
-
-      // Form is already reset by the auth context on success
+      console.error("Resend verification error:", error)
+      toast({
+        title: "Failed to resend verification email",
+        description: error.message || "Please try again later",
+        variant: "error",
+      })
+    } finally {
       setIsLoading(false)
     }
   }
@@ -73,7 +75,7 @@ export function SignupForm() {
             </div>
             <h2 className="mb-2 text-2xl font-bold text-green-700">Verification Email Sent</h2>
             <p className="mb-6 text-green-600">
-              We've sent a verification email to <strong>{userEmail}</strong>
+              We've sent a new verification email to <strong>{userEmail}</strong>
             </p>
             <div className="mb-6 rounded-lg bg-white p-4 text-left text-sm text-gray-600">
               <div className="mb-2 flex items-center">
@@ -86,19 +88,11 @@ export function SignupForm() {
                 <li>Once verified, you can log in to your account</li>
               </ol>
             </div>
-            <div className="flex flex-col space-y-3">
-              <Link href="/login" className="w-full">
-                <Button variant="outline" className="w-full">
-                  Go to Login
-                </Button>
-              </Link>
-              <p className="text-sm text-gray-500">
-                Didn't receive the email?{" "}
-                <Link href="/resend-verification" className="text-purple-600 hover:text-purple-500">
-                  Resend verification email
-                </Link>
-              </p>
-            </div>
+            <Link href="/login" className="w-full">
+              <Button variant="outline" className="w-full">
+                Go to Login
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -108,8 +102,8 @@ export function SignupForm() {
   return (
     <div className="mx-auto w-full max-w-md space-y-6">
       <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold">Create an account</h1>
-        <p className="text-gray-400">Enter your information to create an account</p>
+        <h1 className="text-3xl font-bold">Resend Verification Email</h1>
+        <p className="text-gray-400">Enter your email to receive a new verification link</p>
       </div>
 
       <Form {...form}>
@@ -134,54 +128,14 @@ export function SignupForm() {
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="••••••••"
-                    type="password"
-                    autoComplete="new-password"
-                    disabled={isLoading}
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Confirm Password</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="••••••••"
-                    type="password"
-                    autoComplete="new-password"
-                    disabled={isLoading}
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-500" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating account...
+                Sending...
               </>
             ) : (
-              "Create account"
+              "Resend Verification Email"
             )}
           </Button>
         </form>
@@ -189,7 +143,7 @@ export function SignupForm() {
 
       <div className="text-center text-sm">
         <p className="text-gray-400">
-          Already have an account?{" "}
+          Remember your password?{" "}
           <Link href="/login" className="text-purple-400 hover:text-purple-300">
             Sign in
           </Link>

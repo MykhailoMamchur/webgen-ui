@@ -12,6 +12,7 @@ import {
   refreshToken,
   isTokenExpired,
   getAuthToken,
+  getCurrentUser,
 } from "@/lib/auth"
 
 // Update the User interface to match the API response
@@ -88,42 +89,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Try to get current user with the token using our local API route
-        const response = await fetch("/api/auth/me", {
-          method: "GET",
-          credentials: "include", // Include cookies in the request
-        })
-
-        if (!response.ok) {
+        try {
+          const userData = await getCurrentUser()
+          setUser(userData)
+        } catch (error) {
           // If 401 Unauthorized, try to refresh the token
-          if (response.status === 401) {
-            const refreshed = await refreshUserToken()
-            if (refreshed) {
-              // If refresh succeeds, try to get user data again
-              const retryResponse = await fetch("/api/auth/me", {
-                method: "GET",
-                credentials: "include",
-              })
+          console.error("Failed to get user data:", error)
 
-              if (retryResponse.ok) {
-                const userData = await retryResponse.json()
-                setUser(userData)
-                setIsLoading(false)
-                return
-              }
+          const refreshed = await refreshUserToken()
+          if (refreshed) {
+            // If refresh succeeds, try to get user data again
+            try {
+              const userData = await getCurrentUser()
+              setUser(userData)
+            } catch (retryError) {
+              console.error("Failed to get user data after token refresh:", retryError)
+              setUser(null)
+              router.push("/login")
             }
-
-            // If refresh fails or retry fails, redirect to login
+          } else {
+            // If refresh fails, redirect to login
             setUser(null)
             router.push("/login")
-            setIsLoading(false)
-            return
           }
-
-          throw new Error("Authentication failed")
         }
-
-        const userData = await response.json()
-        setUser(userData)
       } catch (error) {
         console.error("Authentication error:", error)
         setUser(null)
