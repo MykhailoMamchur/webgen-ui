@@ -263,7 +263,7 @@ export default function Header({
               className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-full px-4"
             >
               <Upload className="h-4 w-4 mr-2" />
-              Deploy
+              Publish
             </Button>
           </div>
         </TooltipProvider>
@@ -316,7 +316,7 @@ export default function Header({
               disabled={!currentProject || isGenerating}
             >
               <Upload className="h-4 w-4 mr-2 text-purple-400" />
-              Deploy Website
+              Publish Website
             </DropdownMenuItem>
 
             <DropdownMenuSeparator className="bg-purple-500/10" />

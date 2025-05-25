@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         project_id: body.project_id,
+        alias_type: body.alias_type || "dev", // Default to 'dev' if not specified
       }),
     })
 

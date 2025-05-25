@@ -58,7 +58,10 @@ export default function WebsitePreview({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ project_id: projectId }), // Use projectId instead of projectName
+        body: JSON.stringify({
+          project_id: projectId,
+          alias_type: "dev",
+        }),
         credentials: "include", // Include cookies in the request
       })
 
@@ -608,7 +611,7 @@ export default function WebsitePreview({
             src={deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`}
             title="Website Preview"
             className="w-full h-full border-none"
-            sandbox="allow-same-origin allow-scripts"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-top-navigation-by-user-activation"
             onLoad={handleIframeLoad}
             onError={handleIframeError}
           />
@@ -618,7 +621,7 @@ export default function WebsitePreview({
             ref={iframeRef}
             title="Website Preview"
             className="w-full h-full border-none"
-            sandbox="allow-same-origin allow-scripts"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-top-navigation-by-user-activation"
             onLoad={handleIframeLoad}
             onError={handleIframeError}
           />
