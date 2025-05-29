@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useEffect, useRef, useState } from "react"
-import { Clipboard, Check, Loader2, FileCode, Edit, Replace, AlertTriangle, Trash2 } from "lucide-react"
+import { Clipboard, Check, Loader2, FileCode, Edit, Replace, AlertTriangle, Trash2, Brain } from "lucide-react"
 
 interface CodeViewProps {
   code: string
@@ -180,27 +180,95 @@ const FileAction = ({
   )
 }
 
-// Function to extract file actions from logs, including partial actions
+// Component to display logs artifact
+interface LogsArtifactProps {
+  content: string
+  isPartial?: boolean
+}
+
+const LogsArtifact = ({ content, isPartial = false }: LogsArtifactProps) => {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  return (
+    <div
+      className={`my-2 bg-[#13111C] rounded-lg border ${isPartial ? "border-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.15)]" : "border-red-900/20"} overflow-hidden shadow-sm transition-all duration-200`}
+    >
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-2 p-2 border-b border-red-900/20 bg-[#1A1825] hover:bg-[#1F1A2A] transition-colors"
+      >
+        <AlertTriangle className="h-4 w-4 text-red-400" />
+        <span className="font-medium text-sm text-red-200">Error Logs</span>
+        <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-red-900/30 text-red-300">
+          {isExpanded ? "Collapse" : "Expand"}
+        </span>
+      </button>
+
+      {isExpanded && (
+        <div className="p-3 text-sm font-mono overflow-auto bg-[#1E1A29] max-h-96">
+          <pre className="whitespace-pre-wrap text-red-300">{content}</pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Component to display thinking artifact
+interface ThinkingArtifactProps {
+  content: string
+  isPartial?: boolean
+}
+
+const ThinkingArtifact = ({ content, isPartial = false }: ThinkingArtifactProps) => {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  return (
+    <div
+      className={`my-2 bg-[#13111C] rounded-lg border ${isPartial ? "border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.15)]" : "border-blue-900/20"} overflow-hidden shadow-sm transition-all duration-200`}
+    >
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-2 p-2 border-b border-blue-900/20 bg-[#1A1825] hover:bg-[#1F1A2A] transition-colors"
+      >
+        <Brain className="h-4 w-4 text-blue-400" />
+        <span className="font-medium text-sm text-blue-200">Thinking...</span>
+        <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-300">
+          {isExpanded ? "Collapse" : "Expand"}
+        </span>
+      </button>
+
+      {isExpanded && (
+        <div className="p-3 text-sm font-mono overflow-auto bg-[#1E1A29] max-h-96">
+          <pre className="whitespace-pre-wrap text-blue-300">{content}</pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Unified function to extract all structured content from logs
 const extractFileActionsFromLogs = (logs: string, isGenerating: boolean): React.ReactNode[] => {
   if (!logs) return []
 
   const result: React.ReactNode[] = []
-
-  // First, try to extract complete file actions
-  const completeActionRegex = /<webgen_action\s+type="([^"]+)"\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/webgen_action>/g
-
-  let match
+  
+  // Combined regex to find all structured tags in order
+  const allTagsRegex = /<(webgen_action|webgen_artifact)\s+([^>]*)>([\s\S]*?)(?:<\/\1>|$)/g
+  
   let lastIndex = 0
-  let hasPartialAction = false
-
-  while ((match = completeActionRegex.exec(logs)) !== null) {
-    // Add text before the match as plain text with preserved newlines
+  let match
+  
+  // Process all complete and partial tags in sequential order
+  while ((match = allTagsRegex.exec(logs)) !== null) {
+    const [fullMatch, tagType, attributes, content] = match
+    const isComplete = fullMatch.endsWith(`</${tagType}>`)
+    const isPartial = isGenerating && !isComplete
+    
+    // Add any plain text before this tag
     if (match.index > lastIndex) {
       const textBefore = logs.substring(lastIndex, match.index)
       if (textBefore.trim()) {
-        // Escape HTML characters in regular text
         const escapedText = textBefore.replace(/</g, "&lt;").replace(/>/g, "&gt;")
-
         result.push(
           <div
             key={`text-${result.length}`}
@@ -208,185 +276,113 @@ const extractFileActionsFromLogs = (logs: string, isGenerating: boolean): React.
             dangerouslySetInnerHTML={{
               __html: convertAnsiToHtml(escapedText).replace(/\n/g, "<br />"),
             }}
-          />,
+          />
         )
       }
     }
-
-    const actionType = match[1]
-    const fileName = match[2]
-    const actionContent = match[3]
-
-    // Extract find/replace content if applicable
-    let findContent = ""
-    let replaceContent = ""
-
-    if (actionType === "content_replace") {
-      const findMatch = /<webgen_subaction\s+type="find"[^>]*>([\s\S]*?)<\/webgen_subaction>/g.exec(actionContent)
-      const replaceMatch = /<webgen_subaction\s+type="replace"[^>]*>([\s\S]*?)<\/webgen_subaction>/g.exec(actionContent)
-
-      if (findMatch) findContent = findMatch[1]
-      if (replaceMatch) replaceContent = replaceMatch[1]
-    }
-
-    // Extract issue details if applicable
-    let issueCategory = ""
-    let issueDescription = ""
-
-    if (actionType === "report_issue") {
-      const categoryMatch = match[0].match(/issue_category="([^"]+)"/)
-      const descriptionMatch = match[0].match(/issue_description="([^"]+)"/)
-
-      if (categoryMatch) issueCategory = categoryMatch[1]
-      if (descriptionMatch) issueDescription = descriptionMatch[1]
-
-      if (!issueDescription) issueDescription = actionContent
-    }
-
-    // Add the file action
-    if (actionType === "create_file" || actionType === "edit_file") {
-      result.push(
-        <FileAction
-          key={`action-${result.length}`}
-          type={actionType as "create_file" | "edit_file"}
-          fileName={fileName}
-          content={actionContent}
-        />,
-      )
-    } else if (actionType === "delete_file") {
-      result.push(<FileAction key={`action-${result.length}`} type="delete_file" fileName={fileName} />)
-    } else if (actionType === "content_replace") {
-      result.push(
-        <FileAction
-          key={`action-${result.length}`}
-          type="content_replace"
-          fileName={fileName}
-          findContent={findContent}
-          replaceContent={replaceContent}
-        />,
-      )
-    } else if (actionType === "report_issue") {
-      result.push(
-        <FileAction
-          key={`action-${result.length}`}
-          type="report_issue"
-          issueCategory={issueCategory || "Unknown Issue"}
-          issueDescription={issueDescription || actionContent}
-        />,
-      )
-    }
-
-    lastIndex = match.index + match[0].length
-  }
-
-  // If we're still generating, look for partial actions
-  if (isGenerating) {
-    // Look for an opening tag after the last complete action
-    const remainingText = logs.substring(lastIndex)
-    const partialActionMatch = /<webgen_action\s+type="([^"]+)"\s+name="([^"]+)"[^>]*>/.exec(remainingText)
-
-    if (partialActionMatch) {
-      hasPartialAction = true
-      const actionType = partialActionMatch[1] as "create_file" | "edit_file" | "content_replace" | "report_issue"
-      const fileName = partialActionMatch[2]
-
-      // Get the content after the opening tag
-      const openingTagEndIndex = partialActionMatch.index + partialActionMatch[0].length
-      const partialContent = remainingText.substring(openingTagEndIndex)
-
-      // Add text before the partial action with preserved newlines
-      if (partialActionMatch.index > 0) {
-        const textBefore = remainingText.substring(0, partialActionMatch.index)
-        if (textBefore.trim()) {
-          // Escape HTML characters in regular text
-          const escapedText = textBefore.replace(/</g, "&lt;").replace(/>/g, "&gt;")
-
-          result.push(
-            <div
-              key={`text-${result.length}`}
-              className="font-mono text-sm text-gray-300 my-2 whitespace-pre"
-              dangerouslySetInnerHTML={{
-                __html: convertAnsiToHtml(escapedText).replace(/\n/g, "<br />"),
-              }}
-            />,
-          )
-        }
+    
+    // Parse attributes
+    const parseAttributes = (attrString: string) => {
+      const attrs: Record<string, string> = {}
+      const attrRegex = /(\w+)="([^"]*)"/g
+      let attrMatch
+      while ((attrMatch = attrRegex.exec(attrString)) !== null) {
+        attrs[attrMatch[1]] = attrMatch[2]
       }
-
-      // Add the partial file action
+      return attrs
+    }
+    
+    const attrs = parseAttributes(attributes)
+    
+    if (tagType === 'webgen_action') {
+      const actionType = attrs.type as "create_file" | "edit_file" | "content_replace" | "report_issue" | "delete_file"
+      const fileName = attrs.name
+      
       if (actionType === "create_file" || actionType === "edit_file") {
         result.push(
           <FileAction
-            key={`partial-action-${result.length}`}
+            key={`action-${result.length}`}
             type={actionType}
             fileName={fileName}
-            content={partialContent}
-            isPartial={true}
-          />,
+            content={content}
+            isPartial={isPartial}
+          />
         )
       } else if (actionType === "delete_file") {
         result.push(
           <FileAction
-            key={`partial-action-${result.length}`}
+            key={`action-${result.length}`}
             type="delete_file"
             fileName={fileName}
-            isPartial={true}
-          />,
+            isPartial={isPartial}
+          />
         )
       } else if (actionType === "content_replace") {
-        // For content_replace, we need to check if there are partial subactions
-        const findMatch = /<webgen_subaction\s+type="find"[^>]*>([\s\S]*?)(?:<\/webgen_subaction>|$)/.exec(
-          partialContent,
-        )
+        // Extract find/replace content
+        const findMatch = /<webgen_subaction\s+type="find"[^>]*>([\s\S]*?)(?:<\/webgen_subaction>|$)/.exec(content)
+        const replaceMatch = /<webgen_subaction\s+type="replace"[^>]*>([\s\S]*?)(?:<\/webgen_subaction>|$)/.exec(content)
+        
         const findContent = findMatch ? findMatch[1] : ""
-
-        let replaceContent = ""
-        if (findMatch) {
-          const findEndIndex = findMatch.index + findMatch[0].length
-          const afterFind = partialContent.substring(findEndIndex)
-          const replaceMatch = /<webgen_subaction\s+type="replace"[^>]*>([\s\S]*?)(?:<\/webgen_subaction>|$)/.exec(
-            afterFind,
-          )
-          if (replaceMatch) {
-            replaceContent = replaceMatch[1]
-          }
-        }
-
+        const replaceContent = replaceMatch ? replaceMatch[1] : ""
+        
         result.push(
           <FileAction
-            key={`partial-action-${result.length}`}
+            key={`action-${result.length}`}
             type="content_replace"
             fileName={fileName}
             findContent={findContent}
             replaceContent={replaceContent}
-            isPartial={true}
-          />,
+            isPartial={isPartial}
+          />
         )
       } else if (actionType === "report_issue") {
-        const categoryMatch = partialActionMatch[0].match(/issue_category="([^"]+)"/)
-        const descriptionMatch = partialActionMatch[0].match(/issue_description="([^"]+)"/)
-
         result.push(
           <FileAction
-            key={`partial-action-${result.length}`}
+            key={`action-${result.length}`}
             type="report_issue"
-            issueCategory={categoryMatch ? categoryMatch[1] : "Unknown Issue"}
-            issueDescription={descriptionMatch ? descriptionMatch[1] : partialContent}
-            isPartial={true}
-          />,
+            issueCategory={attrs.issue_category || "Unknown Issue"}
+            issueDescription={attrs.issue_description || content}
+            isPartial={isPartial}
+          />
+        )
+      }
+    } else if (tagType === 'webgen_artifact') {
+      const artifactType = attrs.type
+      
+      if (artifactType === 'logs') {
+        result.push(
+          <LogsArtifact
+            key={`logs-${result.length}`}
+            content={content}
+            isPartial={isPartial}
+          />
+        )
+      } else if (artifactType === 'thinking') {
+        result.push(
+          <ThinkingArtifact
+            key={`thinking-${result.length}`}
+            content={content}
+            isPartial={isPartial}
+          />
         )
       }
     }
+    
+    // Update lastIndex only for complete tags
+    if (isComplete) {
+      lastIndex = match.index + fullMatch.length
+    } else {
+      // For partial tags, we don't want to process the remaining text
+      // as it's part of the incomplete tag
+      break
+    }
   }
-
-  // Add any remaining text as plain text with preserved newlines
-  // Only if there's no partial action or we're not generating
-  if (!hasPartialAction && lastIndex < logs.length) {
+  
+  // Add any remaining text only if we're not in the middle of a partial tag
+  if (lastIndex < logs.length && (!isGenerating || !logs.substring(lastIndex).includes('<webgen_'))) {
     const remainingText = logs.substring(lastIndex)
     if (remainingText.trim()) {
-      // Escape HTML characters in regular text
       const escapedText = remainingText.replace(/</g, "&lt;").replace(/>/g, "&gt;")
-
       result.push(
         <div
           key={`text-${result.length}`}
@@ -394,11 +390,11 @@ const extractFileActionsFromLogs = (logs: string, isGenerating: boolean): React.
           dangerouslySetInnerHTML={{
             __html: convertAnsiToHtml(escapedText).replace(/\n/g, "<br />"),
           }}
-        />,
+        />
       )
     }
   }
-
+  
   return result
 }
 

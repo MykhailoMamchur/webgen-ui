@@ -494,6 +494,9 @@ export default function Home() {
       setProjects((prev) => [...prev, newProject])
       setCurrentProjectId(projectId)
 
+      // Switch to Generation tab when creating a new project
+      setActiveTab("generation")
+
       // Save the welcome message to the server
       await saveMessageToServer(projectId, welcomeMessage)
 
