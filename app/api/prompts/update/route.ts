@@ -38,11 +38,8 @@ export async function POST(request: Request) {
       }),
     })
 
-    console.log("API response status:", response.status)
-
     // Log the response body for debugging
     const responseText = await response.text()
-    console.log("API response body:", responseText)
 
     // Parse the response as JSON
     let data

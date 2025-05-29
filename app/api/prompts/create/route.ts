@@ -21,9 +21,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: "error", error: "Prompt name and text are required" }, { status: 400 })
     }
 
-    console.log("Creating prompt with token:", token.substring(0, 10) + "...")
-    console.log("Request body:", { prompt_name, prompt_text })
-
     // Forward the request to the backend API with the auth token using the environment-specific base URL
     const response = await fetch(`${API_BASE_URL}/prompts/create`, {
       method: "POST",
@@ -37,11 +34,8 @@ export async function POST(request: Request) {
       }),
     })
 
-    console.log("API response status:", response.status)
-
     // Log the response body for debugging
     const responseText = await response.text()
-    console.log("API response body:", responseText)
 
     // Parse the response as JSON
     let data

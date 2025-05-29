@@ -79,15 +79,6 @@ export async function middleware(request: NextRequest) {
   // Check if refresh token exists and is not expired
   const hasValidRefreshToken = !!refreshToken && !isTokenExpired(refreshToken)
 
-  console.log("Middleware check:", {
-    path,
-    hasAccessToken,
-    isAccessTokenExpired,
-    isAuthenticated,
-    hasValidRefreshToken,
-    isPublicPath,
-  })
-
   // Only redirect authenticated users away from public routes
   if (isAuthenticated && isPublicPath) {
     console.log("Middleware: Redirecting authenticated user away from public route")
