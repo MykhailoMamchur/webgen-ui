@@ -4,6 +4,7 @@ import { API_BASE_URL } from "@/lib/config"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const fetchCache = "force-no-store"
+export const revalidate = 0
 
 // Set a longer timeout for the API route
 export const maxDuration = 3600 // 60 minutes
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     // Update the request body to use project_id instead of project_name
     const requestBody = {
       ...body,
-      project_id: body.project_id || body.project_name || body.directory, // Support all formats for backward compatibility
+      project_id: body.project_id || body.project_name || body.directory,
     }
 
     // Remove project_name if it exists to avoid confusion
@@ -38,83 +39,103 @@ export async function POST(request: NextRequest) {
 
     // Set up a handler for request cancellation
     request.signal.addEventListener("abort", () => {
-      // Abort the fetch to the backend when the client aborts
       controller.abort()
     })
 
-    // Update the API endpoint to use the environment-specific base URL
+    console.log(`Making request to: ${API_BASE_URL}/edit`)
+
+    // Fetch from backend with streaming-optimized headers
     const response = await fetch(`${API_BASE_URL}/edit`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), // Ensure proper format with space
+        "Accept": "text/plain",
+        "Cache-Control": "no-cache",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify(requestBody),
-      signal, // Pass the abort signal to the fetch request
+      signal,
+      // Important: don't let fetch buffer the response
+      cache: 'no-store',
     })
 
-    // If the response is not ok, throw an error
+    console.log(`Backend response status: ${response.status}`)
+    console.log(`Backend response headers:`, Object.fromEntries(response.headers.entries()))
+
     if (!response.ok) {
       const errorText = await response.text()
+      console.error(`Backend error: ${response.status} - ${errorText}`)
       throw new Error(`API responded with status ${response.status}: ${errorText}`)
     }
+
+    // Check if the response is actually streaming
+    const contentType = response.headers.get('content-type')
+    console.log(`Content-Type from backend: ${contentType}`)
 
     // Get the response stream
     const stream = response.body
 
-    // If there's no stream, throw an error
     if (!stream) {
       throw new Error("No response stream from API")
     }
 
-    // Create a custom readable stream that ensures proper streaming
-    const readableStream = new ReadableStream({
-      start(controller) {
-        const reader = stream.getReader()
+    // Create headers for the streaming response
+    const responseHeaders = new Headers({
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-cache, no-store, must-revalidate, proxy-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+      "X-Accel-Buffering": "no",
+      "X-Content-Type-Options": "nosniff",
+      "Connection": "keep-alive",
+      "Transfer-Encoding": "chunked",
+    })
 
-        function pump(): Promise<void> {
-          return reader
-            .read()
-            .then(({ done, value }) => {
-              if (done) {
-                controller.close()
-                return
-              }
+    // CRITICAL FIX: Use a TransformStream for better streaming control
+    const { readable, writable } = new TransformStream()
+    
+    // Start the streaming process
+    const reader = stream.getReader()
+    const writer = writable.getWriter()
 
-              // Enqueue the chunk immediately
-              controller.enqueue(value)
-              return pump()
-            })
-            .catch((error) => {
-              controller.error(error)
-            })
+    // Pump data through immediately
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          
+          if (done) {
+            console.log('Stream completed')
+            await writer.close()
+            break
+          }
+
+          console.log(`Streaming chunk of size: ${value?.length || 0}`)
+          await writer.write(value)
         }
+      } catch (error) {
+        console.error('Streaming error:', error)
+        await writer.abort(error)
+      } finally {
+        reader.releaseLock()
+        writer.releaseLock()
+      }
+    }
 
-        return pump()
-      },
+    // Start pumping data (don't await this, let it run in background)
+    pump().catch(console.error)
 
-      cancel() {
-        // Clean up when the stream is cancelled
-        controller.abort()
-      },
-    })
-
-    // Return the stream with proper headers for streaming
-    return new Response(readableStream, {
+    // Return the readable stream immediately
+    return new Response(readable, {
       status: 200,
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache, no-store, must-revalidate, proxy-revalidate",
-        Pragma: "no-cache",
-        Expires: "0",
-        "X-Accel-Buffering": "no",
-        "X-Content-Type-Options": "nosniff",
-        Connection: "keep-alive",
-        // Force streaming by not setting Content-Length
-      },
+      headers: responseHeaders,
     })
+
   } catch (error) {
     console.error("Error in edit API route:", error)
-    return Response.json({ error: `Failed to edit content: ${(error as Error).message}` }, { status: 500 })
+    return Response.json(
+      { error: `Failed to edit content: ${(error as Error).message}` }, 
+      { status: 500 }
+    )
   }
 }

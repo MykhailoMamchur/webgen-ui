@@ -10,17 +10,25 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Ensure streaming works in production
+  // Critical: Disable compression globally for streaming
+  compress: false,
+  
+  // Force static generation to be disabled for API routes
+  trailingSlash: false,
+  
+  // Experimental features for better streaming support
   experimental: {
     serverComponentsExternalPackages: [],
+    // Enable streaming in production
+    appDir: true,
   },
-  // Disable compression for streaming responses
-  compress: false,
-  // Add custom headers to prevent buffering
+  
+  // Custom headers - make sure these apply globally
   async headers() {
     return [
       {
-        source: '/api/edit',
+        // Apply to all API routes
+        source: '/api/:path*',
         headers: [
           {
             key: 'Cache-Control',
@@ -31,12 +39,21 @@ const nextConfig = {
             value: 'no',
           },
           {
+            key: 'Connection',
+            value: 'keep-alive',
+          },
+          {
             key: 'X-Content-Type-Options',
             value: 'nosniff',
           },
         ],
       },
     ]
+  },
+  
+  // Disable static optimization for API routes
+  async rewrites() {
+    return []
   },
 };
 
