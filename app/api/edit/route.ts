@@ -42,8 +42,6 @@ export async function POST(request: NextRequest) {
       controller.abort()
     })
 
-    console.log(`Making request to: ${API_BASE_URL}/edit`)
-
     // Fetch from backend with streaming-optimized headers
     const response = await fetch(`${API_BASE_URL}/edit`, {
       method: "POST",
@@ -59,9 +57,6 @@ export async function POST(request: NextRequest) {
       cache: 'no-store',
     })
 
-    console.log(`Backend response status: ${response.status}`)
-    console.log(`Backend response headers:`, Object.fromEntries(response.headers.entries()))
-
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`Backend error: ${response.status} - ${errorText}`)
@@ -69,8 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if the response is actually streaming
-    const contentType = response.headers.get('content-type')
-    console.log(`Content-Type from backend: ${contentType}`)
+    // const contentType = response.headers.get('content-type')
 
     // Get the response stream
     const stream = response.body
@@ -105,12 +99,10 @@ export async function POST(request: NextRequest) {
           const { done, value } = await reader.read()
           
           if (done) {
-            console.log('Stream completed')
             await writer.close()
             break
           }
 
-          console.log(`Streaming chunk of size: ${value?.length || 0}`)
           await writer.write(value)
         }
       } catch (error) {
