@@ -191,7 +191,7 @@ export default function Header({
       <div className="flex items-center">
         <div className="flex items-center gap-2 mr-6">
           <Sparkles className="h-5 w-5 text-purple-400" />
-          <h1 className="text-xl font-semibold tracking-tight text-white">manufactura.ai</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-white">manufactura</h1>
         </div>
 
         <div className="hidden md:block">
