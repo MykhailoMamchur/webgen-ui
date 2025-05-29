@@ -19,7 +19,7 @@ async function refreshAuthToken(): Promise<string | null> {
   isRefreshing = true
 
   try {
-    console.log("Proactively refreshing token...")
+    console.log("API Client: Proactively refreshing token...")
     const response = await fetch("/api/auth/refresh", {
       method: "POST",
       credentials: "include", // Include cookies in the request
@@ -32,13 +32,20 @@ async function refreshAuthToken(): Promise<string | null> {
     const data = await response.json()
     const newToken = data.access_token
 
+    console.log("API Client: Token refreshed successfully")
+
     // Process the queue with the new token
     refreshQueue.forEach((callback) => callback(newToken))
     refreshQueue = []
 
     return newToken
   } catch (error) {
-    console.error("Token refresh failed:", error)
+    console.error("API Client: Token refresh failed:", error)
+
+    // Process the queue with null to indicate failure
+    refreshQueue.forEach((callback) => callback(""))
+    refreshQueue = []
+
     return null
   } finally {
     isRefreshing = false
@@ -74,7 +81,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
 
           // If token will expire soon, refresh it
           if (timeUntilExpiry < REFRESH_THRESHOLD) {
-            console.log(`Token will expire in ${timeUntilExpiry} seconds, refreshing...`)
+            console.log(`API Client: Token will expire in ${timeUntilExpiry} seconds, refreshing...`)
             const newToken = await refreshAuthToken()
             if (newToken) {
               token = newToken
@@ -83,7 +90,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
         }
       }
     } catch (error) {
-      console.error("Error checking token expiration:", error)
+      console.error("API Client: Error checking token expiration:", error)
     }
   }
 
@@ -103,10 +110,13 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
 
     // If we get a 401 Unauthorized, try to refresh the token and retry the request
     if (response.status === 401) {
+      console.log("API Client: Received 401, attempting token refresh...")
+
       // Try to refresh the token
       const newToken = await refreshAuthToken()
 
       if (newToken) {
+        console.log("API Client: Retrying request with new token...")
         // Retry the request with the new token
         return fetch(url, {
           ...options,
@@ -116,12 +126,16 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
           },
           credentials: "include",
         })
+      } else {
+        console.log("API Client: Token refresh failed, redirecting to login...")
+        // If refresh fails, redirect to login
+        window.location.href = "/login"
       }
     }
 
     return response
   } catch (error) {
-    console.error("API request failed:", error)
+    console.error("API Client: API request failed:", error)
     throw error
   }
 }
