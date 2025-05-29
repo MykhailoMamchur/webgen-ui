@@ -1,6 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { API_BASE_URL } from "@/lib/config"
 
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
 // Set a longer timeout for the API route
 export const maxDuration = 3600 // 60 minutes
 
@@ -68,9 +71,10 @@ export async function POST(request: NextRequest) {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Transfer-Encoding": "chunked",
-        "Cache-Control": "no-cache, no-transform",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
         Connection: "keep-alive",
         "X-Accel-Buffering": "no", // Disable buffering for Nginx
+        "X-Content-Type-Options": "nosniff", // Prevent MIME type sniffing
       },
     })
   } catch (error) {
