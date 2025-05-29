@@ -9,7 +9,7 @@ import { AuthProvider } from "@/context/auth-context"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Manufactura - Converting Websites in Minutes with AI",
+  title: "Manufactura - High-Converting Websites in Minutes with AI",
   description: "Skip agencies and templates. Describe your business, get a custom website with proven conversion patterns, your branding, and clean code you own. Deploy in one click.",
   generator: "Manufactura",
   icons: {
