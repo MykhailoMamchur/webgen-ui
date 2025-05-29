@@ -71,7 +71,7 @@ export function SignupForm() {
             <div className="mb-4 flex justify-center">
               <CheckCircle className="h-16 w-16 text-green-500" />
             </div>
-            <h2 className="mb-2 text-2xl font-bold text-green-700">Verification Email Sent</h2>
+            <h2 className="mb-2 text-xl font-bold text-green-700">Verification Email Sent</h2>
             <p className="mb-6 text-green-600">
               We've sent a verification email to <strong>{userEmail}</strong>
             </p>
@@ -108,7 +108,7 @@ export function SignupForm() {
   return (
     <div className="mx-auto w-full max-w-md space-y-6">
       <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold">Create an account</h1>
+        <h1 className="text-xl font-bold">Create an account</h1>
         <p className="text-gray-400">Enter your information to create an account</p>
       </div>
 
