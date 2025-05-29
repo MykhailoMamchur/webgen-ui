@@ -1,8 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 import { API_BASE_URL } from "@/lib/config"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+export const fetchCache = "force-no-store"
 
 // Set a longer timeout for the API route
 export const maxDuration = 3600 // 60 minutes
@@ -66,19 +67,54 @@ export async function POST(request: NextRequest) {
       throw new Error("No response stream from API")
     }
 
-    // Return the stream directly as the response with appropriate headers
-    return new NextResponse(stream, {
+    // Create a custom readable stream that ensures proper streaming
+    const readableStream = new ReadableStream({
+      start(controller) {
+        const reader = stream.getReader()
+
+        function pump(): Promise<void> {
+          return reader
+            .read()
+            .then(({ done, value }) => {
+              if (done) {
+                controller.close()
+                return
+              }
+
+              // Enqueue the chunk immediately
+              controller.enqueue(value)
+              return pump()
+            })
+            .catch((error) => {
+              controller.error(error)
+            })
+        }
+
+        return pump()
+      },
+
+      cancel() {
+        // Clean up when the stream is cancelled
+        controller.abort()
+      },
+    })
+
+    // Return the stream with proper headers for streaming
+    return new Response(readableStream, {
+      status: 200,
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Transfer-Encoding": "chunked",
-        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Cache-Control": "no-cache, no-store, must-revalidate, proxy-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+        "X-Accel-Buffering": "no",
+        "X-Content-Type-Options": "nosniff",
         Connection: "keep-alive",
-        "X-Accel-Buffering": "no", // Disable buffering for Nginx
-        "X-Content-Type-Options": "nosniff", // Prevent MIME type sniffing
+        // Force streaming by not setting Content-Length
       },
     })
   } catch (error) {
     console.error("Error in edit API route:", error)
-    return NextResponse.json({ error: `Failed to edit content: ${(error as Error).message}` }, { status: 500 })
+    return Response.json({ error: `Failed to edit content: ${(error as Error).message}` }, { status: 500 })
   }
 }
