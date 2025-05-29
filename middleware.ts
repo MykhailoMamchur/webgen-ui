@@ -76,8 +76,8 @@ export async function middleware(request: NextRequest) {
   const isAccessTokenExpired = hasAccessToken ? isTokenExpired(accessToken) : true
   const isAuthenticated = hasAccessToken && !isAccessTokenExpired
 
-  // Check if refresh token exists and is not expired
-  const hasValidRefreshToken = !!refreshToken && !isTokenExpired(refreshToken)
+  // Check if refresh token exists
+  const hasValidRefreshToken = !!refreshToken
 
   // Only redirect authenticated users away from public routes
   if (isAuthenticated && isPublicPath) {
@@ -122,18 +122,18 @@ export async function middleware(request: NextRequest) {
         console.log("Middleware: Tokens refreshed and cookies set, allowing request to continue")
         return response
       } else {
-        // If refresh fails, clear cookies and redirect to signup
-        console.log("Middleware: Token refresh failed, redirecting to signup")
-        const response = NextResponse.redirect(new URL("/signup", request.url))
+        // If refresh fails, clear cookies and redirect to login
+        console.log("Middleware: Token refresh failed, redirecting to login")
+        const response = NextResponse.redirect(new URL("/login", request.url))
         response.cookies.delete("access_token")
         response.cookies.delete("refresh_token")
         return response
       }
     }
 
-    // If no valid refresh token, redirect to signup
-    console.log("Middleware: No valid authentication, redirecting to signup")
-    const response = NextResponse.redirect(new URL("/signup", request.url))
+    // If no valid refresh token, redirect to login
+    console.log("Middleware: No valid authentication, redirecting to login")
+    const response = NextResponse.redirect(new URL("/login", request.url))
     response.cookies.delete("access_token")
     response.cookies.delete("refresh_token")
     return response
