@@ -30,13 +30,6 @@ export default function SubscribePage() {
           email: email,
           userId: userId,
         })
-
-        // Set a small timeout to ensure the Paddle modal has time to open
-        setTimeout(() => {
-          // If the user closes the Paddle modal without completing payment,
-          // they'll be redirected back to where they came from
-          window.location.href = returnUrl
-        }, 500)
       } catch (error) {
         console.error("Error in subscribe page:", error)
         setError((error as Error).message || "Failed to open checkout. Please try again.")
