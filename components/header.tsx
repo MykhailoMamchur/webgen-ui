@@ -1,14 +1,13 @@
 "use client"
 
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-
-import { Sparkles, Upload, Settings, User, ChevronDown, LogOut, Menu } from "lucide-react"
+import { Sparkles, Upload, Settings, User, ChevronDown, LogOut, Menu, Crown, HelpCircle } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -20,6 +19,7 @@ import PromptsModal from "@/components/prompts-modal"
 import { logoutUser } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 import { openPaddleCheckout } from "@/lib/paddle"
+import { useToast } from "@/components/ui/use-toast"
 
 interface HeaderProps {
   currentProject: ProjectSummary | null
@@ -56,6 +56,7 @@ export default function Header({
   const [isLoadingUser, setIsLoadingUser] = useState(true)
   const [showPromptManagement, setShowPromptManagement] = useState(false)
   const router = useRouter()
+  const { toast } = useToast()
 
   // Check for prompt management visibility cookie
   useEffect(() => {
@@ -129,6 +130,14 @@ export default function Header({
       // Fallback if user data is not available
       window.open("https://usemanufactura.com/pricing", "_blank")
     }
+  }
+
+  const handleGetHelp = () => {
+    toast({
+      title: "Need assistance?",
+      description: "Feel free to reach out to our support team at support@usemanufactura.com",
+      duration: 5000,
+    })
   }
 
   // Get user initials for avatar
@@ -237,11 +246,18 @@ export default function Header({
               className="hover:bg-emerald-500/10 focus:bg-emerald-500/10 cursor-pointer py-2.5"
               onClick={handleUpgrade}
             >
-              <div className="flex items-center w-full">
-                <span className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">
-                  Upgrade Plan
-                </span>
-              </div>
+              <Crown className="h-4 w-4 mr-3 text-emerald-400" />
+              <span className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">
+                Upgrade Plan
+              </span>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer py-2.5"
+              onClick={handleGetHelp}
+            >
+              <HelpCircle className="h-4 w-4 mr-3 text-purple-400" />
+              <span className="text-white">Get Help</span>
             </DropdownMenuItem>
 
             {showPromptManagement && (
