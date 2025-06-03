@@ -116,11 +116,39 @@ export default function Header({
   }
 
   // Update the handleUpgrade function to redirect to the root domain
-  const handleUpgrade = () => {
-    // Get the current path to use as return URL
-    const returnUrl = window.location.pathname
-    // Redirect to the root domain subscribe page
-    window.location.href = `https://usemanufactura.com/subscribe?returnUrl=${encodeURIComponent(returnUrl)}`
+  const handleUpgrade = async () => {
+    try {
+      // Fetch user data before redirecting
+      const response = await fetch("/api/auth/me", {
+        method: "GET",
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch user data")
+      }
+
+      const fetchedUserData = await response.json()
+
+      if (!fetchedUserData.email || !fetchedUserData.id) {
+        throw new Error("User information is incomplete")
+      }
+
+      // Get current path for return URL
+      const currentPath = window.location.pathname + window.location.search
+
+      // Redirect to root domain with user data as URL parameters
+      const subscribeUrl = new URL("https://usemanufactura.com/subscribe")
+      subscribeUrl.searchParams.set("email", fetchedUserData.email)
+      subscribeUrl.searchParams.set("userId", fetchedUserData.id)
+      subscribeUrl.searchParams.set("returnUrl", `${window.location.origin}${currentPath}`)
+
+      window.location.href = subscribeUrl.toString()
+    } catch (error) {
+      console.error("Error preparing upgrade:", error)
+      // Fallback to external pricing page
+      window.open("https://usemanufactura.com/pricing", "_blank")
+    }
   }
 
   const handleGetHelp = () => {

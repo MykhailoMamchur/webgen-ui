@@ -12,40 +12,30 @@ export default function SubscribePage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchUserAndOpenCheckout = async () => {
+    const openCheckoutWithParams = async () => {
       try {
         setIsLoading(true)
 
-        // Fetch user data
-        const response = await fetch("/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-        })
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch user data. Please try again.")
-        }
-
-        const userData = await response.json()
-
-        if (!userData.email || !userData.id) {
-          throw new Error("User information is incomplete. Please log in again.")
-        }
-
-        // Get return URL from query params or default to home
+        // Get user data from URL parameters
+        const email = searchParams.get("email")
+        const userId = searchParams.get("userId")
         const returnUrl = searchParams.get("returnUrl") || "/"
+
+        if (!email || !userId) {
+          throw new Error("Missing user information. Please try again from the app.")
+        }
 
         // Initialize Paddle and open checkout
         await openPaddleCheckout({
-          email: userData.email,
-          userId: userData.id,
+          email: email,
+          userId: userId,
         })
 
         // Set a small timeout to ensure the Paddle modal has time to open
         setTimeout(() => {
           // If the user closes the Paddle modal without completing payment,
           // they'll be redirected back to where they came from
-          router.push(returnUrl)
+          window.location.href = returnUrl
         }, 500)
       } catch (error) {
         console.error("Error in subscribe page:", error)
@@ -55,8 +45,18 @@ export default function SubscribePage() {
       }
     }
 
-    fetchUserAndOpenCheckout()
-  }, [router, searchParams])
+    openCheckoutWithParams()
+  }, [searchParams])
+
+  const handleGoBack = () => {
+    const returnUrl = searchParams.get("returnUrl")
+    if (returnUrl) {
+      window.location.href = returnUrl
+    } else {
+      // Fallback to app domain
+      window.location.href = "https://app.usemanufactura.com"
+    }
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-[#0A090F] text-white p-4">
@@ -72,7 +72,7 @@ export default function SubscribePage() {
             <p className="text-gray-300">{error}</p>
           </div>
           <button
-            onClick={() => router.back()}
+            onClick={handleGoBack}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-md transition-colors"
           >
             Go Back
@@ -82,7 +82,7 @@ export default function SubscribePage() {
         <div className="flex flex-col items-center space-y-6 max-w-md text-center">
           <p className="text-lg">If the payment window doesn't open automatically, please click the button below.</p>
           <button
-            onClick={() => router.back()}
+            onClick={handleGoBack}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-md transition-colors"
           >
             Return to App
