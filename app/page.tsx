@@ -284,6 +284,15 @@ export default function Home() {
     return renewalDate.toLocaleDateString("en-US", options)
   }
 
+  // Function to get the appropriate warning message based on edits left
+  const getWarningMessage = (editsLeft: number, renewalDate: string): string => {
+    if (editsLeft === 0) {
+      return `You are out of edits. Your limit will reset on ${renewalDate}.`
+    } else {
+      return `You are running low on edits. Your limit will reset on ${renewalDate}.`
+    }
+  }
+
   // Update the function to use project_id instead of project_name/directory
   // Function to save a message to the server
   const saveMessageToServer = async (projectId: string, message: { role: "user" | "assistant"; content: string }) => {
@@ -1330,8 +1339,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-sm text-purple-100">
-                You are running low on edits. Your limit will reset on{" "}
-                <span className="font-medium">{formatRenewalDate(tierData.renewal_at)}</span>.
+                {getWarningMessage(tierData.edits_left, formatRenewalDate(tierData.renewal_at))}
               </span>
             </div>
             <div className="flex items-center gap-3">
