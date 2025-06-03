@@ -85,6 +85,6 @@ export const openPaddleCheckout = async (options: PaddleCheckoutOptions): Promis
   } catch (error) {
     console.error("Error opening Paddle checkout:", error)
     // Fallback to external pricing page
-    window.open("https://app.usemanufactura.com/pricing", "_blank")
+    window.open("https://app.usemanufactura.com", "_blank")
   }
 }

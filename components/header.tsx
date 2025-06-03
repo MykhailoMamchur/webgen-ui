@@ -1,5 +1,7 @@
 "use client"
 
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+
 import { Sparkles, Upload, Settings, User, ChevronDown, LogOut, Menu } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -7,7 +9,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -224,48 +225,52 @@ export default function Header({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 bg-[#252525] border-purple-500/20 text-white">
-            <DropdownMenuLabel className="text-gray-400">My Account</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-gray-400 font-medium">My Account</DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-purple-500/10" />
-            <DropdownMenuItem className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer">
-              <User className="h-4 w-4 mr-2 text-purple-400" />
-              Profile Settings
+
+            <DropdownMenuItem className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer py-2.5">
+              <User className="h-4 w-4 mr-3 text-purple-400" />
+              <span className="text-white">Profile Settings</span>
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer"
+              className="hover:bg-emerald-500/10 focus:bg-emerald-500/10 cursor-pointer py-2.5"
               onClick={handleUpgrade}
             >
-              <span className="text-sm text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">
-                Upgrade Plan
-              </span>
+              <div className="flex items-center w-full">
+                <span className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">
+                  Upgrade Plan
+                </span>
+              </div>
             </DropdownMenuItem>
 
             {showPromptManagement && (
               <DropdownMenuItem
-                className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer md:hidden"
+                className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer py-2.5 md:hidden"
                 onClick={handleOpenPromptsModal}
               >
-                <Settings className="h-4 w-4 mr-2 text-purple-400" />
-                Manage Prompts
+                <Settings className="h-4 w-4 mr-3 text-purple-400" />
+                <span className="text-white">Manage Prompts</span>
               </DropdownMenuItem>
             )}
 
             <DropdownMenuItem
-              className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer md:hidden"
+              className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer py-2.5 md:hidden"
               onClick={onDeploy}
               disabled={!currentProject || isGenerating}
             >
-              <Upload className="h-4 w-4 mr-2 text-purple-400" />
-              Publish Website
+              <Upload className="h-4 w-4 mr-3 text-purple-400" />
+              <span className="text-white">Publish Website</span>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator className="bg-purple-500/10" />
+
             <DropdownMenuItem
-              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer"
+              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer py-2.5"
               onClick={handleSignOut}
             >
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+              <LogOut className="h-4 w-4 mr-3" />
+              <span>Sign Out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
