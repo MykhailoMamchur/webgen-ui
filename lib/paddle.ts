@@ -1,4 +1,4 @@
-import { PADDLE_ENVIRONMENT, PADDLE_CLIENT_TOKEN, PADDLE_SUBSCRIPTION_PRICE_ID } from "./config"
+import { PADDLE_ENVIRONMENT, PADDLE_CLIENT_TOKEN, PADDLE_SUBSCRIPTION_PRICE_ID, PADDLE_SUCCESS_URL } from "./config"
 
 declare global {
   interface Window {
@@ -11,54 +11,22 @@ interface PaddleCheckoutOptions {
   userId: string
 }
 
-// Load Paddle script and initialize
-export const initializePaddle = (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    // Check if Paddle is already loaded
-    if (window.Paddle) {
-      resolve()
-      return
-    }
-
-    // Create and load the Paddle script
-    const script = document.createElement("script")
-    script.src = "https://cdn.paddle.com/paddle/v2/paddle.js"
-    script.async = true
-
-    script.onload = () => {
-      try {
-        // Set environment
-        window.Paddle.Environment.set(PADDLE_ENVIRONMENT)
-
-        // Initialize Paddle
-        window.Paddle.Initialize({
-          token: PADDLE_CLIENT_TOKEN,
-        })
-
-        resolve()
-      } catch (error) {
-        reject(error)
-      }
-    }
-
-    script.onerror = () => {
-      reject(new Error("Failed to load Paddle script"))
-    }
-
-    document.head.appendChild(script)
-  })
-}
-
-// Open Paddle checkout
-export const openPaddleCheckout = async (options: PaddleCheckoutOptions): Promise<void> => {
+export const openPaddleCheckout = async ({ email, userId }: PaddleCheckoutOptions): Promise<void> => {
   try {
-    // Ensure Paddle is initialized
-    await initializePaddle()
-
-    if (!PADDLE_SUBSCRIPTION_PRICE_ID) {
-      throw new Error("Paddle subscription price ID not configured")
+    // Load Paddle script if not already loaded
+    if (!window.Paddle) {
+      await loadPaddleScript()
     }
 
+    // Initialize Paddle if not already initialized
+    if (!window.Paddle.Environment) {
+      window.Paddle.Environment.set(PADDLE_ENVIRONMENT)
+      window.Paddle.Initialize({
+        token: PADDLE_CLIENT_TOKEN,
+      })
+    }
+
+    // Define the items for checkout
     const itemsList = [
       {
         priceId: PADDLE_SUBSCRIPTION_PRICE_ID,
@@ -66,25 +34,43 @@ export const openPaddleCheckout = async (options: PaddleCheckoutOptions): Promis
       },
     ]
 
+    // Open the checkout
     window.Paddle.Checkout.open({
       settings: {
         displayMode: "overlay",
         variant: "one-page",
         theme: "dark",
-        showAddDiscounts: false,
-        successUrl: "https://app.usemanufactura.com",
+        successUrl: PADDLE_SUCCESS_URL,
+        showAddDiscounts: false
       },
       items: itemsList,
       customer: {
-        email: options.email,
+        email: email,
       },
       customData: {
-        user_id: options.userId,
+        user_id: userId,
       },
     })
   } catch (error) {
     console.error("Error opening Paddle checkout:", error)
     // Fallback to external pricing page
-    window.open("https://app.usemanufactura.com", "_blank")
+    window.open("https://usemanufactura.com/pricing", "_blank")
   }
+}
+
+const loadPaddleScript = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    // Check if script is already loaded
+    if (document.querySelector('script[src*="paddle.js"]')) {
+      resolve()
+      return
+    }
+
+    const script = document.createElement("script")
+    script.src = "https://cdn.paddle.com/paddle/v2/paddle.js"
+    script.async = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error("Failed to load Paddle script"))
+    document.head.appendChild(script)
+  })
 }

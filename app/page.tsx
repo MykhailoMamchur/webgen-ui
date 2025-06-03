@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Header from "@/components/header"
 import ChatSidebar from "@/components/chat-sidebar"
 import WebsitePreview from "@/components/website-preview"
@@ -12,6 +12,7 @@ import ProjectFilesTab from "@/components/project-files-tab"
 import type { Project, ProjectSummary } from "@/types/project"
 import DeploymentModal from "@/components/deployment-modal"
 import PromptsModal from "@/components/prompts-modal"
+import UpgradeSuccessBanner from "@/components/upgrade-success-banner"
 import { useAuth } from "@/context/auth-context"
 import { X } from "lucide-react"
 import { openPaddleCheckout } from "@/lib/paddle"
@@ -214,6 +215,7 @@ interface UserData {
 // Update the Home component to handle selected elements
 export default function Home() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { isAuthenticated, isLoading } = useAuth()
 
   // Add state for selected elements
@@ -236,6 +238,9 @@ export default function Home() {
   const [tierData, setTierData] = useState<TierData | null>(null)
   const [showLowEditsWarning, setShowLowEditsWarning] = useState(false)
 
+  // Add state for upgrade success banner
+  const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(false)
+
   const [userData, setUserData] = useState<UserData | null>(null)
 
   // Projects state
@@ -249,6 +254,21 @@ export default function Home() {
   const websiteContent = currentProject?.websiteContent || DEFAULT_HTML
   const codeContent = currentProject?.codeContent || DEFAULT_HTML
   const projectName = currentProject?.name || ""
+
+  // Check for upgrade success from URL parameters
+  useEffect(() => {
+    const upgradeSuccess = searchParams.get("upgrade_success")
+    const paymentSuccess = searchParams.get("payment_success")
+
+    if (upgradeSuccess === "true" || paymentSuccess === "true") {
+      setShowUpgradeSuccess(true)
+      // Clean up the URL parameters
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete("upgrade_success")
+      newUrl.searchParams.delete("payment_success")
+      window.history.replaceState({}, "", newUrl.toString())
+    }
+  }, [searchParams])
 
   // Redirect to signup if not authenticated
   useEffect(() => {
@@ -1370,6 +1390,9 @@ export default function Home() {
   // Fix the width issues by adding a min-width to the main content area
   return (
     <div className="flex flex-col h-screen bg-[#0A090F]">
+      {/* Upgrade Success Banner */}
+      {showUpgradeSuccess && <UpgradeSuccessBanner onDismiss={() => setShowUpgradeSuccess(false)} />}
+
       <Header
         currentProject={currentProjectSummary}
         projects={projectSummaries}
@@ -1383,7 +1406,7 @@ export default function Home() {
       />
 
       {/* Low edits warning banner */}
-      {showLowEditsWarning && tierData && (
+      {showLowEditsWarning && tierData && !showUpgradeSuccess && (
         <div className="bg-purple-900/20 border-b border-purple-900/30 px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
