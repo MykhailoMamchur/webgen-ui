@@ -67,7 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           pathname === "/signup" ||
           pathname === "/login" ||
           pathname === "/reset-password" ||
-          pathname === "/verify-email"
+          pathname === "/verify-email" ||
+          pathname === "/subscribe"
         ) {
           setUser(null)
           setIsLoading(false)
