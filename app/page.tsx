@@ -15,7 +15,6 @@ import PromptsModal from "@/components/prompts-modal"
 import UpgradeSuccessHandler from "@/components/upgrade-success-handler"
 import { useAuth } from "@/context/auth-context"
 import { X } from "lucide-react"
-import { openPaddleCheckout } from "@/lib/paddle"
 
 // Update the DEFAULT_HTML to be empty
 const DEFAULT_HTML = ``
@@ -1170,20 +1169,10 @@ function HomeContent() {
     setIsPromptsModalOpen(true)
   }
 
-  const handleUpgrade = async () => {
-    if (userData?.email && userData?.id) {
-      try {
-        await openPaddleCheckout({
-          email: userData.email,
-          userId: userData.id,
-        })
-      } catch (error) {
-        console.error("Error opening upgrade checkout:", error)
-      }
-    } else {
-      // Fallback if user data is not available
-      window.open("https://usemanufactura.com/pricing", "_blank")
-    }
+  const handleUpgrade = () => {
+    // Get the current path to use as return URL
+    const returnUrl = window.location.pathname
+    router.push(`/subscribe?returnUrl=${encodeURIComponent(returnUrl)}`)
   }
 
   const tabs = [

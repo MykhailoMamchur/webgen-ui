@@ -18,7 +18,6 @@ import type { ProjectSummary } from "@/types/project"
 import PromptsModal from "@/components/prompts-modal"
 import { logoutUser } from "@/lib/auth"
 import { useRouter } from "next/navigation"
-import { openPaddleCheckout } from "@/lib/paddle"
 import { useToast } from "@/components/ui/use-toast"
 
 interface HeaderProps {
@@ -116,20 +115,10 @@ export default function Header({
     }
   }
 
-  const handleUpgrade = async () => {
-    if (userData?.email && userData?.id) {
-      try {
-        await openPaddleCheckout({
-          email: userData.email,
-          userId: userData.id,
-        })
-      } catch (error) {
-        console.error("Error opening upgrade checkout:", error)
-      }
-    } else {
-      // Fallback if user data is not available
-      window.open("https://usemanufactura.com/pricing", "_blank")
-    }
+  const handleUpgrade = () => {
+    // Get the current path to use as return URL
+    const returnUrl = window.location.pathname
+    router.push(`/subscribe?returnUrl=${encodeURIComponent(returnUrl)}`)
   }
 
   const handleGetHelp = () => {
