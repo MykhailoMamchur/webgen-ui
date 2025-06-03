@@ -808,7 +808,7 @@ function HomeContent() {
 
         // Fetch messages one more time after saving the assistant response
         try {
-          const serverMessages = await loadMessagesFromServer(project.id)
+          const serverMessages = await loadMessagesFromServer(currentProject.id)
           if (serverMessages && serverMessages.length > 0) {
             updateCurrentProject({ messages: serverMessages })
           }
@@ -1169,10 +1169,12 @@ function HomeContent() {
     setIsPromptsModalOpen(true)
   }
 
+  // Update the handleUpgrade function to redirect to the root domain
   const handleUpgrade = () => {
     // Get the current path to use as return URL
     const returnUrl = window.location.pathname
-    router.push(`/subscribe?returnUrl=${encodeURIComponent(returnUrl)}`)
+    // Redirect to the root domain subscribe page
+    window.location.href = `https://usemanufactura.com/subscribe?returnUrl=${encodeURIComponent(returnUrl)}`
   }
 
   const tabs = [
