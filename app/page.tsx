@@ -13,6 +13,7 @@ import type { Project, ProjectSummary } from "@/types/project"
 import DeploymentModal from "@/components/deployment-modal"
 import PromptsModal from "@/components/prompts-modal"
 import { useAuth } from "@/context/auth-context"
+import { X } from "lucide-react"
 
 // Update the DEFAULT_HTML to be empty
 const DEFAULT_HTML = ``
@@ -36,7 +37,58 @@ const generateProjectName = (existingNames: string[] = []) => {
     "icy",
     "delicate",
     "quiet",
-    "white"
+    "white",
+    "cool",
+    "spring",
+    "winter",
+    "patient",
+    "twilight",
+    "dawn",
+    "crimson",
+    "wispy",
+    "weathered",
+    "blue",
+    "billowing",
+    "broken",
+    "cold",
+    "damp",
+    "falling",
+    "frosty",
+    "green",
+    "long",
+    "late",
+    "lingering",
+    "bold",
+    "little",
+    "morning",
+    "muddy",
+    "old",
+    "red",
+    "rough",
+    "still",
+    "small",
+    "sparkling",
+    "throbbing",
+    "shy",
+    "wandering",
+    "withered",
+    "wild",
+    "black",
+    "young",
+    "holy",
+    "solitary",
+    "fragrant",
+    "aged",
+    "snowy",
+    "proud",
+    "floral",
+    "restless",
+    "divine",
+    "polished",
+    "ancient",
+    "purple",
+    "lively",
+    "nameless",
   ]
 
   const nouns = [
@@ -51,7 +103,59 @@ const generateProjectName = (existingNames: string[] = []) => {
     "snow",
     "lake",
     "sunset",
-    "pine"
+    "pine",
+    "shadow",
+    "leaf",
+    "dawn",
+    "glitter",
+    "forest",
+    "hill",
+    "cloud",
+    "meadow",
+    "sun",
+    "glade",
+    "bird",
+    "brook",
+    "butterfly",
+    "bush",
+    "dew",
+    "dust",
+    "field",
+    "fire",
+    "flower",
+    "firefly",
+    "feather",
+    "grass",
+    "haze",
+    "mountain",
+    "night",
+    "pond",
+    "darkness",
+    "snowflake",
+    "silence",
+    "sound",
+    "sky",
+    "shape",
+    "surf",
+    "thunder",
+    "violet",
+    "water",
+    "wildflower",
+    "wave",
+    "water",
+    "resonance",
+    "sun",
+    "wood",
+    "dream",
+    "cherry",
+    "tree",
+    "fog",
+    "frost",
+    "voice",
+    "paper",
+    "frog",
+    "smoke",
+    "star",
   ]
 
   let name = ""
@@ -91,6 +195,14 @@ interface ImageData {
   originalHeight?: number | null
 }
 
+// Add TierData interface
+interface TierData {
+  user_id: string
+  tier_type: string
+  edits_left: number
+  renewal_at: number
+}
+
 // Update the Home component to handle selected elements
 export default function Home() {
   const router = useRouter()
@@ -112,6 +224,10 @@ export default function Home() {
   // Add state for prompts modal
   const [isPromptsModalOpen, setIsPromptsModalOpen] = useState(false)
 
+  // Add state for tier data and low edits warning
+  const [tierData, setTierData] = useState<TierData | null>(null)
+  const [showLowEditsWarning, setShowLowEditsWarning] = useState(false)
+
   // Projects state
   const [projects, setProjects] = useState<Project[]>([])
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
@@ -130,6 +246,43 @@ export default function Home() {
       router.push("/signup")
     }
   }, [isAuthenticated, isLoading, router])
+
+  // Function to fetch user tier data
+  const fetchUserTierData = async () => {
+    try {
+      const response = await fetch("/api/user/tier", {
+        method: "GET",
+        credentials: "include",
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.status === "success" && data.tier_data) {
+          setTierData(data.tier_data)
+          // Check if user is running low on edits
+          if (data.tier_data.edits_left <= 5) {
+            setShowLowEditsWarning(true)
+          } else {
+            setShowLowEditsWarning(false)
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user tier data:", error)
+    }
+  }
+
+  // Function to format renewal date
+  const formatRenewalDate = (renewalTimestamp: number): string => {
+    const renewalDate = new Date(renewalTimestamp)
+    const options: Intl.DateTimeFormatOptions = {
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      hour12: true,
+    }
+    return renewalDate.toLocaleDateString("en-US", options)
+  }
 
   // Update the function to use project_id instead of project_name/directory
   // Function to save a message to the server
@@ -296,7 +449,9 @@ export default function Home() {
       }
     }
 
+    // Fetch projects and tier data
     fetchProjects()
+    fetchUserTierData()
   }, [isAuthenticated, isLoading])
 
   // Save projects to localStorage whenever they change
@@ -817,6 +972,9 @@ export default function Home() {
       setIsGenerating(false)
       setAbortController(null)
 
+      // Fetch tier data after each edit to update edits_left
+      await fetchUserTierData()
+
       // Switch to preview tab when generation is complete
       setActiveTab("preview")
 
@@ -1017,6 +1175,9 @@ export default function Home() {
       // Load logs
       const serverLogs = await loadLogsFromServer(selectedProject.id)
 
+      // Fetch tier data when switching projects
+      await fetchUserTierData()
+
       // Update project with messages and logs
       setProjects((prevProjects) =>
         prevProjects.map((project) => {
@@ -1162,6 +1323,38 @@ export default function Home() {
         onDeploy={handleDeploy}
         onOpenPrompts={handleOpenPrompts}
       />
+
+      {/* Low edits warning banner */}
+      {showLowEditsWarning && tierData && (
+        <div className="bg-purple-900/20 border-b border-purple-900/30 px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-purple-100">
+                You are running low on edits. Your limit will reset on{" "}
+                <span className="font-medium">{formatRenewalDate(tierData.renewal_at)}</span>.
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  // Add upgrade plan functionality here
+                  window.open("https://usemanufactura.com/pricing", "_blank")
+                }}
+                className="text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
+              >
+                Upgrade Plan
+              </button>
+              <button
+                onClick={() => setShowLowEditsWarning(false)}
+                className="text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         <ChatSidebar
           messages={messages}
