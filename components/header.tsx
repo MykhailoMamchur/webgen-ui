@@ -1,6 +1,6 @@
 "use client"
 
-import { Sparkles, Upload, Settings, User, ChevronDown, LogOut, Menu, Crown, HelpCircle } from "lucide-react"
+import { Sparkles, Upload, Settings, User, ChevronDown, LogOut, Menu, Zap, HelpCircle } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -265,7 +265,7 @@ export default function Header({
               className="hover:bg-emerald-500/10 focus:bg-emerald-500/10 cursor-pointer py-2.5"
               onClick={handleUpgrade}
             >
-              <Crown className="h-4 w-4 mr-3 text-emerald-400" />
+              <Zap className="h-4 w-4 mr-3 text-emerald-400" />
               <span className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">
                 Upgrade Plan
               </span>
