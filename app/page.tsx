@@ -14,6 +14,7 @@ import DeploymentModal from "@/components/deployment-modal"
 import PromptsModal from "@/components/prompts-modal"
 import { useAuth } from "@/context/auth-context"
 import { X } from "lucide-react"
+import { openPaddleCheckout } from "@/lib/paddle"
 
 // Update the DEFAULT_HTML to be empty
 const DEFAULT_HTML = ``
@@ -203,6 +204,13 @@ interface TierData {
   renewal_at: number
 }
 
+// Add UserData interface
+interface UserData {
+  id: string
+  email: string
+  name?: string
+}
+
 // Update the Home component to handle selected elements
 export default function Home() {
   const router = useRouter()
@@ -227,6 +235,8 @@ export default function Home() {
   // Add state for tier data and low edits warning
   const [tierData, setTierData] = useState<TierData | null>(null)
   const [showLowEditsWarning, setShowLowEditsWarning] = useState(false)
+
+  const [userData, setUserData] = useState<UserData | null>(null)
 
   // Projects state
   const [projects, setProjects] = useState<Project[]>([])
@@ -271,6 +281,29 @@ export default function Home() {
       console.error("Error fetching user tier data:", error)
     }
   }
+
+  // Fetch user data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setUserData(data)
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error)
+      }
+    }
+
+    if (isAuthenticated && !isLoading) {
+      fetchUserData()
+    }
+  }, [isAuthenticated, isLoading])
 
   // Function to format renewal date
   const formatRenewalDate = (renewalTimestamp: number): string => {
@@ -1133,6 +1166,22 @@ export default function Home() {
     setIsPromptsModalOpen(true)
   }
 
+  const handleUpgrade = async () => {
+    if (userData?.email && userData?.id) {
+      try {
+        await openPaddleCheckout({
+          email: userData.email,
+          userId: userData.id,
+        })
+      } catch (error) {
+        console.error("Error opening upgrade checkout:", error)
+      }
+    } else {
+      // Fallback if user data is not available
+      window.open("https://usemanufactura.com/pricing", "_blank")
+    }
+  }
+
   const tabs = [
     { id: "preview", label: "Preview" },
     { id: "generation", label: "Generation" },
@@ -1344,10 +1393,7 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => {
-                  // Add upgrade plan functionality here
-                  window.open("https://usemanufactura.com/pricing", "_blank")
-                }}
+                onClick={handleUpgrade}
                 className="text-sm text-emerald-400 hover:text-emerald-300 font-semibold transition-colors hover:bg-emerald-500/20 px-3 py-1.5 rounded-md hover:border-emerald-500/30"
               >
                 Upgrade Plan

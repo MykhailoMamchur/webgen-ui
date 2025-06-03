@@ -18,6 +18,7 @@ import type { ProjectSummary } from "@/types/project"
 import PromptsModal from "@/components/prompts-modal"
 import { logoutUser } from "@/lib/auth"
 import { useRouter } from "next/navigation"
+import { openPaddleCheckout } from "@/lib/paddle"
 
 interface HeaderProps {
   currentProject: ProjectSummary | null
@@ -110,6 +111,22 @@ export default function Header({
       router.push("/login")
     } catch (error) {
       console.error("Error signing out:", error)
+    }
+  }
+
+  const handleUpgrade = async () => {
+    if (userData?.email && userData?.id) {
+      try {
+        await openPaddleCheckout({
+          email: userData.email,
+          userId: userData.id,
+        })
+      } catch (error) {
+        console.error("Error opening upgrade checkout:", error)
+      }
+    } else {
+      // Fallback if user data is not available
+      window.open("https://usemanufactura.com/pricing", "_blank")
     }
   }
 
@@ -212,6 +229,15 @@ export default function Header({
             <DropdownMenuItem className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer">
               <User className="h-4 w-4 mr-2 text-purple-400" />
               Profile Settings
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer"
+              onClick={handleUpgrade}
+            >
+              <span className="text-sm text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">
+                Upgrade Plan
+              </span>
             </DropdownMenuItem>
 
             {showPromptManagement && (
