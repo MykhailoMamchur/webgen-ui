@@ -52,7 +52,23 @@ export default function Header({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [isLoadingUser, setIsLoadingUser] = useState(true)
+  const [showPromptManagement, setShowPromptManagement] = useState(false)
   const router = useRouter()
+
+  // Check for prompt management visibility cookie
+  useEffect(() => {
+    const checkPromptManagementVisibility = () => {
+      const cookies = document.cookie.split(";")
+      const promptManagementCookie = cookies.find((cookie) => cookie.trim().startsWith("prompt_management_visible="))
+
+      if (promptManagementCookie) {
+        const value = promptManagementCookie.split("=")[1]
+        setShowPromptManagement(value === "true")
+      }
+    }
+
+    checkPromptManagementVisibility()
+  }, [])
 
   // Fetch user data
   useEffect(() => {
@@ -140,23 +156,25 @@ export default function Header({
       <div className="ml-auto flex items-center gap-2">
         <TooltipProvider>
           <div className="hidden md:flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleOpenPromptsModal}
-                  disabled={isGenerating}
-                  className="h-9 w-9 rounded-full text-gray-300 hover:text-white hover:bg-purple-500/20 disabled:opacity-50"
-                >
-                  <Settings className="h-4 w-4" />
-                  <span className="sr-only">Prompts</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Manage Prompts</p>
-              </TooltipContent>
-            </Tooltip>
+            {showPromptManagement && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleOpenPromptsModal}
+                    disabled={isGenerating}
+                    className="h-9 w-9 rounded-full text-gray-300 hover:text-white hover:bg-purple-500/20 disabled:opacity-50"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span className="sr-only">Prompts</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Manage Prompts</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
 
             <Button
               variant="default"
@@ -196,13 +214,15 @@ export default function Header({
               Profile Settings
             </DropdownMenuItem>
 
-            <DropdownMenuItem
-              className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer md:hidden"
-              onClick={handleOpenPromptsModal}
-            >
-              <Settings className="h-4 w-4 mr-2 text-purple-400" />
-              Manage Prompts
-            </DropdownMenuItem>
+            {showPromptManagement && (
+              <DropdownMenuItem
+                className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer md:hidden"
+                onClick={handleOpenPromptsModal}
+              >
+                <Settings className="h-4 w-4 mr-2 text-purple-400" />
+                Manage Prompts
+              </DropdownMenuItem>
+            )}
 
             <DropdownMenuItem
               className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer md:hidden"

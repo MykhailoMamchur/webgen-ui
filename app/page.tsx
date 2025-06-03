@@ -1348,7 +1348,7 @@ export default function Home() {
                   // Add upgrade plan functionality here
                   window.open("https://usemanufactura.com/pricing", "_blank")
                 }}
-                className="text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
+                className="text-sm text-emerald-400 hover:text-emerald-300 font-semibold transition-colors bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-md border border-emerald-500/20 hover:border-emerald-500/30"
               >
                 Upgrade Plan
               </button>
