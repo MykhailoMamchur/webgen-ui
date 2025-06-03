@@ -828,6 +828,31 @@ export default function Home() {
         credentials: "include", // Include cookies in the request
       })
 
+      // Handle 402 Payment Required status
+      if (response.status === 402) {
+        const upgradeMessage = "You have no edits left. Upgrade plan to continue."
+        setGenerationError(upgradeMessage)
+
+        // Add an upgrade message to the chat
+        if (currentProjectId && currentProject) {
+          const upgradeResponse = {
+            role: "assistant" as const,
+            content: upgradeMessage,
+          }
+
+          updateCurrentProject({
+            messages: [...messages, upgradeResponse],
+          })
+
+          // Save the upgrade message to the server
+          await saveMessageToServer(currentProject.id, upgradeResponse)
+        }
+
+        setIsGenerating(false)
+        setAbortController(null)
+        return
+      }
+
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || `Server responded with status ${response.status}`)
