@@ -20,7 +20,7 @@ console.log(`API Base URL: ${API_BASE_URL}`)
 export const getApiBaseUrl = () => API_BASE_URL
 
 // Paddle payment configuration
-export const PADDLE_ENVIRONMENT = "sandbox"
-export const PADDLE_CLIENT_TOKEN = "test_3c827e906e240be60606966e954"
-export const PADDLE_SUBSCRIPTION_PRICE_ID = "pri_01jwr8we80tpewr9exarwp6694"
+export const PADDLE_ENVIRONMENT = "production" //"sandbox"
+export const PADDLE_CLIENT_TOKEN = "live_69ae6bd301189aa5e56aba29f57" //"test_3c827e906e240be60606966e954"
+export const PADDLE_SUBSCRIPTION_PRICE_ID = "pri_01jvd8zchk1smxtf38wq33vney" //"pri_01jwr8we80tpewr9exarwp6694"
 export const PADDLE_SUCCESS_URL = "https://app.usemanufactura.com/?upgrade_success=true"
