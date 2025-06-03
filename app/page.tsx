@@ -36,58 +36,7 @@ const generateProjectName = (existingNames: string[] = []) => {
     "icy",
     "delicate",
     "quiet",
-    "white",
-    "cool",
-    "spring",
-    "winter",
-    "patient",
-    "twilight",
-    "dawn",
-    "crimson",
-    "wispy",
-    "weathered",
-    "blue",
-    "billowing",
-    "broken",
-    "cold",
-    "damp",
-    "falling",
-    "frosty",
-    "green",
-    "long",
-    "late",
-    "lingering",
-    "bold",
-    "little",
-    "morning",
-    "muddy",
-    "old",
-    "red",
-    "rough",
-    "still",
-    "small",
-    "sparkling",
-    "throbbing",
-    "shy",
-    "wandering",
-    "withered",
-    "wild",
-    "black",
-    "young",
-    "holy",
-    "solitary",
-    "fragrant",
-    "aged",
-    "snowy",
-    "proud",
-    "floral",
-    "restless",
-    "divine",
-    "polished",
-    "ancient",
-    "purple",
-    "lively",
-    "nameless",
+    "white"
   ]
 
   const nouns = [
@@ -102,59 +51,7 @@ const generateProjectName = (existingNames: string[] = []) => {
     "snow",
     "lake",
     "sunset",
-    "pine",
-    "shadow",
-    "leaf",
-    "dawn",
-    "glitter",
-    "forest",
-    "hill",
-    "cloud",
-    "meadow",
-    "sun",
-    "glade",
-    "bird",
-    "brook",
-    "butterfly",
-    "bush",
-    "dew",
-    "dust",
-    "field",
-    "fire",
-    "flower",
-    "firefly",
-    "feather",
-    "grass",
-    "haze",
-    "mountain",
-    "night",
-    "pond",
-    "darkness",
-    "snowflake",
-    "silence",
-    "sound",
-    "sky",
-    "shape",
-    "surf",
-    "thunder",
-    "violet",
-    "water",
-    "wildflower",
-    "wave",
-    "water",
-    "resonance",
-    "sun",
-    "wood",
-    "dream",
-    "cherry",
-    "tree",
-    "fog",
-    "frost",
-    "voice",
-    "paper",
-    "frog",
-    "smoke",
-    "star",
+    "pine"
   ]
 
   let name = ""
@@ -828,9 +725,21 @@ export default function Home() {
         credentials: "include", // Include cookies in the request
       })
 
-      // Handle 402 Payment Required status
+      // Handle 402 Payment Required status BEFORE trying to read the response body
       if (response.status === 402) {
-        const upgradeMessage = "You have no edits left. Upgrade plan to continue."
+        let upgradeMessage = "You have no edits left. Upgrade plan to continue."
+
+        // Try to get the detailed error message from the response
+        try {
+          const errorData = await response.json()
+          if (errorData.detail) {
+            upgradeMessage = errorData.detail
+          }
+        } catch (parseError) {
+          // Use default message if we can't parse the response
+          console.error("Error parsing 402 response:", parseError)
+        }
+
         setGenerationError(upgradeMessage)
 
         // Add an upgrade message to the chat
@@ -853,6 +762,7 @@ export default function Home() {
         return
       }
 
+      // Handle other non-OK responses
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || `Server responded with status ${response.status}`)
