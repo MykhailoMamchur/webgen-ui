@@ -71,6 +71,7 @@ export const openPaddleCheckout = async (options: PaddleCheckoutOptions): Promis
         displayMode: "overlay",
         variant: "one-page",
         theme: "dark",
+        showAddDiscounts: false,
         successUrl: "https://app.usemanufactura.com",
       },
       items: itemsList,

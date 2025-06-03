@@ -23,8 +23,3 @@ export const getApiBaseUrl = () => API_BASE_URL
 export const PADDLE_ENVIRONMENT = "sandbox"
 export const PADDLE_CLIENT_TOKEN = "test_3c827e906e240be60606966e954"
 export const PADDLE_SUBSCRIPTION_PRICE_ID = "pri_01jwr8we80tpewr9exarwp6694"
-
-// Log Paddle configuration during startup
-console.log(`Paddle Environment: ${PADDLE_ENVIRONMENT}`)
-console.log(`Paddle Client Token: ${PADDLE_CLIENT_TOKEN ? "Set" : "Not set"}`)
-console.log(`Paddle Subscription Price ID: ${PADDLE_SUBSCRIPTION_PRICE_ID ? "Set" : "Not set"}`)
