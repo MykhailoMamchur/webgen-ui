@@ -1,6 +1,6 @@
 "use client"
 
-import { Sparkles, ExternalLink, Upload, Settings, User, ChevronDown, LogOut, Menu } from "lucide-react"
+import { Sparkles, Upload, Settings, User, ChevronDown, LogOut, Menu } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -31,11 +31,6 @@ interface HeaderProps {
   onOpenPrompts?: () => void
 }
 
-interface DeploymentAlias {
-  project_name: string
-  alias: string
-}
-
 interface UserData {
   id: string
   email: string
@@ -53,9 +48,6 @@ export default function Header({
   onDeploy,
   onOpenPrompts,
 }: HeaderProps) {
-  const [deploymentAlias, setDeploymentAlias] = useState<string | null>(null)
-  const [isLoadingAlias, setIsLoadingAlias] = useState(false)
-  const [deploymentError, setDeploymentError] = useState<boolean>(false)
   const [isPromptsModalOpen, setIsPromptsModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [userData, setUserData] = useState<UserData | null>(null)
@@ -87,77 +79,6 @@ export default function Header({
 
     fetchUserData()
   }, [])
-
-  // Update the useEffect to use project_id
-  useEffect(() => {
-    if (currentProject?.id && !isGenerating) {
-      getDeploymentAlias(currentProject.id)
-    } else {
-      setDeploymentAlias(null)
-    }
-  }, [currentProject, isGenerating])
-
-  const getDeploymentAlias = async (projectId: string) => {
-    try {
-      setIsLoadingAlias(true)
-      setDeploymentError(false)
-
-      const response = await fetch("/api/deployment/alias", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ project_id: projectId }),
-      })
-
-      const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text()
-        console.error("Non-JSON response:", text)
-        setDeploymentError(true)
-        throw new Error("Server returned an invalid response format")
-      }
-
-      if (response.ok) {
-        const data = (await response.json()) as DeploymentAlias
-        if (data.alias) {
-          setDeploymentAlias(data.alias)
-        } else {
-          setDeploymentError(true)
-          throw new Error("No alias returned from deployment service")
-        }
-      } else {
-        const errorData = await response.json()
-        setDeploymentError(true)
-        throw new Error(errorData.error || `Failed to get deployment alias: ${response.status}`)
-      }
-    } catch (error) {
-      console.error("Error getting deployment alias:", error)
-      setDeploymentAlias(null)
-      setDeploymentError(true)
-    } finally {
-      setIsLoadingAlias(false)
-    }
-  }
-
-  const isPreviewEnabled =
-    currentProject?.id && !isLoadingAlias && ((!isGenerating && !deploymentError) || deploymentAlias !== null)
-
-  const handlePreviewClick = () => {
-    if (!currentProject?.id) return
-
-    if (deploymentAlias) {
-      const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
-      window.open(url, "_blank")
-    } else {
-      getDeploymentAlias(currentProject.id).then(() => {
-        if (deploymentAlias) {
-          const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
-          window.open(url, "_blank")
-        }
-      })
-    }
-  }
 
   const handleOpenPromptsModal = () => {
     if (onOpenPrompts) {
@@ -224,24 +145,6 @@ export default function Header({
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={handlePreviewClick}
-                  disabled={!isPreviewEnabled}
-                  className="h-9 w-9 rounded-full text-gray-300 hover:text-white hover:bg-purple-500/20 disabled:opacity-50"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  <span className="sr-only">Preview</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Preview Website</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
                   onClick={handleOpenPromptsModal}
                   disabled={isGenerating}
                   className="h-9 w-9 rounded-full text-gray-300 hover:text-white hover:bg-purple-500/20 disabled:opacity-50"
@@ -299,15 +202,6 @@ export default function Header({
             >
               <Settings className="h-4 w-4 mr-2 text-purple-400" />
               Manage Prompts
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              className="hover:bg-purple-500/20 focus:bg-purple-500/20 cursor-pointer md:hidden"
-              onClick={handlePreviewClick}
-              disabled={!isPreviewEnabled}
-            >
-              <ExternalLink className="h-4 w-4 mr-2 text-purple-400" />
-              Preview Website
             </DropdownMenuItem>
 
             <DropdownMenuItem

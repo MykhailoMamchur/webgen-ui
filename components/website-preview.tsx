@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, ExternalLink } from "lucide-react"
 // Add imports for the selection mode button
 import { Pointer, X } from "lucide-react"
 
@@ -491,6 +491,14 @@ export default function WebsitePreview({
     }
   }
 
+  // Function to open preview in new tab
+  const openPreview = () => {
+    if (deploymentAlias) {
+      const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
+      window.open(url, "_blank", "noopener,noreferrer")
+    }
+  }
+
   // Listen for messages from the iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -549,6 +557,14 @@ export default function WebsitePreview({
                 : `https://${deploymentAlias}`
               : "preview.manufactura.ai"}
           </div>
+          <button
+            onClick={openPreview}
+            className="ml-2 p-1.5 rounded-md bg-background border border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            title="Open preview in new tab"
+            disabled={!deploymentAlias || isGenerating}
+          >
+            <ExternalLink className="h-4 w-4" />
+          </button>
           <button
             onClick={toggleSelectionMode}
             className={`ml-2 p-1.5 rounded-md ${
