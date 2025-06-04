@@ -111,6 +111,19 @@ export default function ChatSidebar({
     }
 
     if (input.trim() || selectedImages.length > 0) {
+      // Check if this is the first user message (no previous user messages)
+      const hasUserMessages = messages.some((message) => message.role === "user")
+      const isFirstUserMessage = !hasUserMessages
+
+      // Show toast for first message
+      if (isFirstUserMessage) {
+        toast({
+          title: "Website Generation Started",
+          description:
+            "Your website is generating, this could take up to 10 minutes. Please keep this tab open in your browser.",
+          duration: 8000, // Show for 8 seconds
+        })
+      }
       onSendMessage(input, selectedImages.length > 0 ? selectedImages : undefined)
       setInput("")
       // Clear the images after sending

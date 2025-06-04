@@ -247,7 +247,7 @@ export default function Header({
                 </AvatarFallback>
               </Avatar>
               <span className="hidden md:inline-block max-w-[150px] truncate">
-                {isLoadingUser ? "Loading..." : userData?.email || "User"}
+                {isLoadingUser ? "Loading..." : userData?.email ? userData.email.split("@")[0] : "User"}
               </span>
               <ChevronDown className="h-4 w-4 ml-1 opacity-70" />
             </Button>
