@@ -42,6 +42,7 @@ interface ChatSidebarProps {
   onClearSelectedElements?: () => void
   onRestoreCheckpoint?: (hash: string) => void
   restoringCheckpoint?: string | null
+  isEditing?: boolean // Add this new prop
 }
 
 export default function ChatSidebar({
@@ -55,6 +56,7 @@ export default function ChatSidebar({
   onClearSelectedElements,
   onRestoreCheckpoint,
   restoringCheckpoint = null,
+  isEditing = false, // Add this new prop with default value
 }: ChatSidebarProps) {
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -81,6 +83,9 @@ export default function ChatSidebar({
   // Maximum allowed dimension in pixels
   const MAX_DIMENSION = 8000
 
+  // Add this state after the existing state declarations
+  const [hasShownEditToast, setHasShownEditToast] = useState(false)
+
   // Calculate checkpoint numbers when messages change
   useEffect(() => {
     const counts: Record<string, number> = {}
@@ -95,6 +100,22 @@ export default function ChatSidebar({
 
     setCheckpointCounts(counts)
   }, [messages])
+
+  // Add this useEffect after the existing useEffects
+  useEffect(() => {
+    if (isEditing && !hasShownEditToast) {
+      toast({
+        title: "Edit in Progress",
+        description:
+          "Your edit is being processed, this typically takes up to 2 minutes. Please keep this tab open in your browser.",
+        duration: 6000, // Show for 6 seconds
+      })
+      setHasShownEditToast(true)
+    } else if (!isEditing) {
+      // Reset the flag when editing is complete
+      setHasShownEditToast(false)
+    }
+  }, [isEditing, hasShownEditToast, toast])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -118,12 +139,13 @@ export default function ChatSidebar({
       // Show toast for first message
       if (isFirstUserMessage) {
         toast({
-          title: "Website Generation Started",
+          title: "🚀 Website Generation Started",
           description:
-            "Your website is generating, this could take up to 10 minutes. Please keep this tab open in your browser.",
+            "Your website is generating, this could take up to 10 minutes. Please keep this tab open in your browser for the best experience.",
           duration: 8000, // Show for 8 seconds
         })
       }
+
       onSendMessage(input, selectedImages.length > 0 ? selectedImages : undefined)
       setInput("")
       // Clear the images after sending
