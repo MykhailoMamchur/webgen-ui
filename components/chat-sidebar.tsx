@@ -84,8 +84,6 @@ export default function ChatSidebar({
   // Add state to track if we've shown toasts
   const [hasShownFirstMessageToast, setHasShownFirstMessageToast] = useState(false)
   const [hasShownEditToast, setHasShownEditToast] = useState(false)
-
-  // Add state to track if we're editing (based on selectedElementsCount)
   const [isEditing, setIsEditing] = useState(false)
 
   // Calculate checkpoint numbers when messages change
@@ -159,26 +157,22 @@ export default function ChatSidebar({
       const hasUserMessages = messages.some((message) => message.role === "user")
       const isFirstUserMessage = !hasUserMessages
 
-      // Show toast for first message if we haven't shown it yet
-      if (isFirstUserMessage && !hasShownFirstMessageToast) {
+      if (isFirstUserMessage) {
+        // Show generation toast for first message
         toast({
           title: "🚀 Website Generation Started",
           description:
             "Your website is generating, this could take up to 10 minutes. Please keep this tab open in your browser for the best experience.",
           duration: 8000, // Show for 8 seconds
         })
-        setHasShownFirstMessageToast(true)
-      }
-
-      // Show edit toast if elements are selected and we haven't shown it yet
-      if (selectedElementsCount > 0 && !hasShownEditToast) {
+      } else {
+        // Show edit toast for all subsequent messages
         toast({
           title: "Edit in Progress",
           description:
             "Your edit is being processed, this typically takes up to 2 minutes. Please keep this tab open in your browser.",
           duration: 6000, // Show for 6 seconds
         })
-        setHasShownEditToast(true)
       }
 
       onSendMessage(input, selectedImages.length > 0 ? selectedImages : undefined)
