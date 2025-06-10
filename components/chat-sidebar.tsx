@@ -42,7 +42,6 @@ interface ChatSidebarProps {
   onClearSelectedElements?: () => void
   onRestoreCheckpoint?: (hash: string) => void
   restoringCheckpoint?: string | null
-  isEditing?: boolean // Add this new prop
 }
 
 export default function ChatSidebar({
@@ -56,7 +55,6 @@ export default function ChatSidebar({
   onClearSelectedElements,
   onRestoreCheckpoint,
   restoringCheckpoint = null,
-  isEditing = false, // Add this new prop with default value
 }: ChatSidebarProps) {
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -83,8 +81,12 @@ export default function ChatSidebar({
   // Maximum allowed dimension in pixels
   const MAX_DIMENSION = 8000
 
-  // Add this state after the existing state declarations
+  // Add state to track if we've shown toasts
+  const [hasShownFirstMessageToast, setHasShownFirstMessageToast] = useState(false)
   const [hasShownEditToast, setHasShownEditToast] = useState(false)
+
+  // Add state to track if we're editing (based on selectedElementsCount)
+  const [isEditing, setIsEditing] = useState(false)
 
   // Calculate checkpoint numbers when messages change
   useEffect(() => {
@@ -101,9 +103,14 @@ export default function ChatSidebar({
     setCheckpointCounts(counts)
   }, [messages])
 
-  // Add this useEffect after the existing useEffects
+  // Detect editing state based on selectedElementsCount
   useEffect(() => {
-    if (isEditing && !hasShownEditToast) {
+    // If elements are selected, we're in editing mode
+    const editing = selectedElementsCount > 0
+    setIsEditing(editing)
+
+    // If we're now editing and haven't shown the toast yet
+    if (editing && !hasShownEditToast) {
       toast({
         title: "Edit in Progress",
         description:
@@ -111,11 +118,27 @@ export default function ChatSidebar({
         duration: 6000, // Show for 6 seconds
       })
       setHasShownEditToast(true)
-    } else if (!isEditing) {
+    } else if (!editing) {
       // Reset the flag when editing is complete
       setHasShownEditToast(false)
     }
-  }, [isEditing, hasShownEditToast, toast])
+  }, [selectedElementsCount, hasShownEditToast, toast])
+
+  // Also detect editing state when a message is sent with selected elements
+  useEffect(() => {
+    if (isGenerating && selectedElementsCount > 0 && !hasShownEditToast) {
+      toast({
+        title: "Edit in Progress",
+        description:
+          "Your edit is being processed, this typically takes up to 2 minutes. Please keep this tab open in your browser.",
+        duration: 6000, // Show for 6 seconds
+      })
+      setHasShownEditToast(true)
+    } else if (!isGenerating) {
+      // Reset the flag when generation is complete
+      setHasShownEditToast(false)
+    }
+  }, [isGenerating, selectedElementsCount, hasShownEditToast, toast])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -136,14 +159,26 @@ export default function ChatSidebar({
       const hasUserMessages = messages.some((message) => message.role === "user")
       const isFirstUserMessage = !hasUserMessages
 
-      // Show toast for first message
-      if (isFirstUserMessage) {
+      // Show toast for first message if we haven't shown it yet
+      if (isFirstUserMessage && !hasShownFirstMessageToast) {
         toast({
           title: "🚀 Website Generation Started",
           description:
             "Your website is generating, this could take up to 10 minutes. Please keep this tab open in your browser for the best experience.",
           duration: 8000, // Show for 8 seconds
         })
+        setHasShownFirstMessageToast(true)
+      }
+
+      // Show edit toast if elements are selected and we haven't shown it yet
+      if (selectedElementsCount > 0 && !hasShownEditToast) {
+        toast({
+          title: "Edit in Progress",
+          description:
+            "Your edit is being processed, this typically takes up to 2 minutes. Please keep this tab open in your browser.",
+          duration: 6000, // Show for 6 seconds
+        })
+        setHasShownEditToast(true)
       }
 
       onSendMessage(input, selectedImages.length > 0 ? selectedImages : undefined)
