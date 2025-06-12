@@ -5,9 +5,20 @@ import { getApiBaseUrl, COOKIE_DOMAIN, useSecureCookies } from "./lib/config"
 // Function to check if a JWT token is expired
 function isTokenExpired(token: string): boolean {
   try {
+    console.log(`Middleware: Checking token expiration for token: ${token.substring(0, 20)}...`)
+
     // Extract the payload from the JWT token
-    const base64Url = token.split(".")[1]
-    if (!base64Url) return true
+    const parts = token.split(".")
+    if (parts.length !== 3) {
+      console.log("Middleware: Token doesn't have 3 parts, considering expired")
+      return true
+    }
+
+    const base64Url = parts[1]
+    if (!base64Url) {
+      console.log("Middleware: No payload part found, considering expired")
+      return true
+    }
 
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
     const jsonPayload = decodeURIComponent(
@@ -17,12 +28,26 @@ function isTokenExpired(token: string): boolean {
         .join(""),
     )
 
-    const { exp } = JSON.parse(jsonPayload)
+    const payload = JSON.parse(jsonPayload)
+    console.log(`Middleware: Token payload parsed successfully, exp: ${payload.exp}`)
+
+    const { exp } = payload
 
     // Check if the token is expired
-    if (!exp) return false
+    if (!exp) {
+      console.log("Middleware: No expiration time in token, considering valid")
+      return false
+    }
+
     const currentTime = Math.floor(Date.now() / 1000)
-    return currentTime >= exp
+    const isExpired = currentTime >= exp
+    const timeUntilExpiry = exp - currentTime
+
+    console.log(
+      `Middleware: Current time: ${currentTime}, Token exp: ${exp}, Time until expiry: ${timeUntilExpiry}s, Is expired: ${isExpired}`,
+    )
+
+    return isExpired
   } catch (error) {
     console.error("Middleware: Error checking token expiration:", error)
     return true // If we can't parse the token, assume it's expired
@@ -32,7 +57,10 @@ function isTokenExpired(token: string): boolean {
 // Function to check if token is about to expire (within 5 minutes)
 function isTokenExpiringSoon(token: string): boolean {
   try {
-    const base64Url = token.split(".")[1]
+    const parts = token.split(".")
+    if (parts.length !== 3) return true
+
+    const base64Url = parts[1]
     if (!base64Url) return true
 
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
@@ -98,6 +126,7 @@ async function refreshTokens(refreshToken: string): Promise<{ accessToken: strin
 
 // Function to clear authentication cookies
 function clearAuthCookies(response: NextResponse) {
+  console.log("Middleware: Clearing authentication cookies")
   response.cookies.set({
     name: "access_token",
     value: "",
@@ -126,8 +155,8 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
   console.log(`Middleware: Processing request to ${path}`)
 
-  // Skip middleware for API routes to avoid infinite loops
-  if (path.startsWith("/api/")) {
+  // Skip middleware for static files and API routes
+  if (path.startsWith("/api/") || path.startsWith("/_next/") || (path.includes(".") && !path.endsWith("/"))) {
     return NextResponse.next()
   }
 
@@ -146,6 +175,13 @@ export async function middleware(request: NextRequest) {
 
   console.log(`Middleware: Access token exists: ${!!accessToken}`)
   console.log(`Middleware: Refresh token exists: ${!!refreshToken}`)
+
+  if (accessToken) {
+    console.log(`Middleware: Access token preview: ${accessToken.substring(0, 50)}...`)
+  }
+  if (refreshToken) {
+    console.log(`Middleware: Refresh token preview: ${refreshToken.substring(0, 50)}...`)
+  }
 
   // Check if access token exists and is not expired
   const hasAccessToken = !!accessToken
@@ -231,7 +267,7 @@ export async function middleware(request: NextRequest) {
           domain: COOKIE_DOMAIN,
         })
 
-        // Set the new refresh token cookie - FIXED: Added missing domain
+        // Set the new refresh token cookie
         response.cookies.set({
           name: "refresh_token",
           value: newTokens.refreshToken,
@@ -240,7 +276,7 @@ export async function middleware(request: NextRequest) {
           sameSite: "lax",
           maxAge: 60 * 60 * 24 * 7, // 7 days
           path: "/",
-          domain: COOKIE_DOMAIN, // THIS WAS THE CRITICAL MISSING PIECE!
+          domain: COOKIE_DOMAIN,
         })
 
         console.log("Middleware: Tokens refreshed and cookies set, allowing request to continue")

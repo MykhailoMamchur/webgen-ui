@@ -13,7 +13,12 @@ export const getAuthToken = (): string | null => {
       {} as Record<string, string>,
     )
 
-    return cookies["access_token"] || null
+    const token = cookies["access_token"] || null
+    console.log(`Auth: Getting token from cookies, exists: ${!!token}`)
+    if (token) {
+      console.log(`Auth: Token preview: ${token.substring(0, 50)}...`)
+    }
+    return token
   }
   return null
 }
@@ -23,9 +28,20 @@ export const isTokenExpired = (token: string): boolean => {
   if (!token) return true
 
   try {
+    console.log(`Auth: Checking if token is expired: ${token.substring(0, 20)}...`)
+
     // Extract the payload from the JWT token
-    const base64Url = token.split(".")[1]
-    if (!base64Url) return true
+    const parts = token.split(".")
+    if (parts.length !== 3) {
+      console.log("Auth: Token doesn't have 3 parts, considering expired")
+      return true
+    }
+
+    const base64Url = parts[1]
+    if (!base64Url) {
+      console.log("Auth: No payload part found, considering expired")
+      return true
+    }
 
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
     const jsonPayload = decodeURIComponent(
@@ -35,14 +51,28 @@ export const isTokenExpired = (token: string): boolean => {
         .join(""),
     )
 
-    const { exp } = JSON.parse(jsonPayload)
+    const payload = JSON.parse(jsonPayload)
+    console.log(`Auth: Token payload parsed, exp: ${payload.exp}`)
+
+    const { exp } = payload
 
     // Check if the token is expired
-    if (!exp) return false
+    if (!exp) {
+      console.log("Auth: No expiration in token, considering valid")
+      return false
+    }
+
     const currentTime = Math.floor(Date.now() / 1000)
-    return currentTime >= exp
+    const isExpired = currentTime >= exp
+    const timeUntilExpiry = exp - currentTime
+
+    console.log(
+      `Auth: Current time: ${currentTime}, Token exp: ${exp}, Time until expiry: ${timeUntilExpiry}s, Is expired: ${isExpired}`,
+    )
+
+    return isExpired
   } catch (error) {
-    console.error("Error checking token expiration:", error)
+    console.error("Auth: Error checking token expiration:", error)
     return true // If we can't parse the token, assume it's expired
   }
 }
@@ -65,6 +95,7 @@ export async function loginUser(email: string, password: string) {
   }
 
   const data = await response.json()
+  console.log("Auth: Login successful, tokens received")
   return data
 }
 
@@ -90,6 +121,7 @@ export async function registerUser(email: string, password: string, passwordConf
   }
 
   const data = await response.json()
+  console.log("Auth: Registration successful, tokens received")
   return data
 }
 
@@ -106,6 +138,7 @@ export async function logoutUser() {
     throw new Error(errorData.error || errorData.message || "Logout failed")
   }
 
+  console.log("Auth: Logout successful")
   return await response.json()
 }
 
@@ -136,23 +169,25 @@ export async function getCurrentUser() {
 // Refresh token
 export async function refreshToken() {
   try {
-    console.log("Attempting to refresh token...")
+    console.log("Auth: Attempting to refresh token...")
     const response = await fetch("/api/auth/refresh", {
       method: "POST",
       credentials: "include", // Include cookies in the request
     })
 
+    console.log(`Auth: Refresh response status: ${response.status}`)
+
     if (!response.ok) {
       const errorData = await response.json()
-      console.error("Token refresh failed:", errorData)
+      console.error("Auth: Token refresh failed:", errorData)
       throw new Error(errorData.error || errorData.message || "Failed to refresh token")
     }
 
     const data = await response.json()
-    console.log("Token refreshed successfully")
+    console.log("Auth: Token refreshed successfully")
     return data
   } catch (error) {
-    console.error("Failed to refresh token:", error)
+    console.error("Auth: Failed to refresh token:", error)
     throw error
   }
 }
