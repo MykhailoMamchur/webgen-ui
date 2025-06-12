@@ -5,12 +5,12 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Loader2, CheckCircle, Mail } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Loader2 } from "lucide-react"
 
 // Form validation schema
 const signupSchema = z
@@ -33,9 +33,8 @@ type SignupFormValues = z.infer<typeof signupSchema>
 
 export function SignupForm() {
   const { signup } = useAuth()
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
-  const [userEmail, setUserEmail] = useState("")
 
   // Initialize form
   const form = useForm<SignupFormValues>({
@@ -52,57 +51,13 @@ export function SignupForm() {
     try {
       setIsLoading(true)
       await signup(values.email, values.password, values.confirmPassword)
-      setUserEmail(values.email)
-      setIsSuccess(true)
+      // Redirect to verify email page after successful signup
+      router.push("/verify-email")
     } catch (error: any) {
       // Error is handled in the auth context, but we can add specific handling here if needed
       console.error("Signup error:", error)
-
-      // Form is already reset by the auth context on success
       setIsLoading(false)
     }
-  }
-
-  if (isSuccess) {
-    return (
-      <div className="mx-auto w-full max-w-md">
-        <Card className="border-green-100 bg-green-50">
-          <CardContent className="pt-6 text-center">
-            <div className="mb-4 flex justify-center">
-              <CheckCircle className="h-16 w-16 text-green-500" />
-            </div>
-            <h2 className="mb-2 text-xl font-bold text-green-700">Verification Email Sent</h2>
-            <p className="mb-6 text-green-600">
-              We've sent a verification email to <strong>{userEmail}</strong>
-            </p>
-            <div className="mb-6 rounded-lg bg-white p-4 text-left text-sm text-gray-600">
-              <div className="mb-2 flex items-center">
-                <Mail className="mr-2 h-5 w-5 text-purple-500" />
-                <span className="font-medium">Next steps:</span>
-              </div>
-              <ol className="ml-7 list-decimal space-y-1">
-                <li>Check your email inbox (and spam folder)</li>
-                <li>Click the verification link in the email</li>
-                <li>Once verified, you can log in to your account</li>
-              </ol>
-            </div>
-            <div className="flex flex-col space-y-3">
-              <Link href="/login" className="w-full">
-                <Button variant="outline" className="w-full">
-                  Go to Login
-                </Button>
-              </Link>
-              <p className="text-sm text-gray-500">
-                Didn't receive the email?{" "}
-                <Link href="/resend-verification" className="text-purple-600 hover:text-purple-500">
-                  Resend verification email
-                </Link>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
   }
 
   return (

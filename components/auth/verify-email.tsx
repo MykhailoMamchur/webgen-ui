@@ -40,16 +40,15 @@ function VerifyEmailContent() {
   if (!token) {
     return (
       <div className="mx-auto w-full max-w-md space-y-6">
-        <div className="space-y-4 text-center">
-          <div className="flex justify-center">
+        <div className="space-y-2 text-center">
+          <div className="flex justify-center mb-4">
             <div className="rounded-full bg-purple-500/10 p-3">
               <Mail className="h-8 w-8 text-purple-400" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-white">Verify your email</h1>
-          <p className="text-gray-400 leading-relaxed">
-            Please check your email for a verification link. Click the link to verify your email address and activate
-            your account.
+          <h1 className="text-xl font-bold">Check your email</h1>
+          <p className="text-gray-400">
+            We've sent a verification link to your email address. Click the link to verify your account.
           </p>
         </div>
 
@@ -65,6 +64,15 @@ function VerifyEmailContent() {
             </Link>
           </Button>
         </div>
+
+        <div className="text-center text-sm">
+          <p className="text-gray-400">
+            Didn't receive the email?{" "}
+            <Link href="/resend-verification" className="text-purple-400 hover:text-purple-300">
+              Resend verification email
+            </Link>
+          </p>
+        </div>
       </div>
     )
   }
@@ -72,13 +80,13 @@ function VerifyEmailContent() {
   if (isLoading) {
     return (
       <div className="mx-auto w-full max-w-md space-y-6">
-        <div className="space-y-4 text-center">
-          <div className="flex justify-center">
+        <div className="space-y-2 text-center">
+          <div className="flex justify-center mb-4">
             <div className="rounded-full bg-purple-500/10 p-4">
               <Loader2 className="h-12 w-12 animate-spin text-purple-400" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-white">Verifying your email</h1>
+          <h1 className="text-xl font-bold">Verifying your email</h1>
           <p className="text-gray-400">Please wait while we verify your email address...</p>
         </div>
       </div>
@@ -88,14 +96,14 @@ function VerifyEmailContent() {
   if (error) {
     return (
       <div className="mx-auto w-full max-w-md space-y-6">
-        <div className="space-y-4 text-center">
-          <div className="flex justify-center">
+        <div className="space-y-2 text-center">
+          <div className="flex justify-center mb-4">
             <div className="rounded-full bg-red-500/10 p-3">
               <XCircle className="h-12 w-12 text-red-400" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-white">Verification failed</h1>
-          <p className="text-gray-400 leading-relaxed">{error}</p>
+          <h1 className="text-xl font-bold">Verification failed</h1>
+          <p className="text-gray-400">{error}</p>
         </div>
 
         <div className="space-y-4">
@@ -117,17 +125,14 @@ function VerifyEmailContent() {
   if (isVerified) {
     return (
       <div className="mx-auto w-full max-w-md space-y-6">
-        <div className="space-y-4 text-center">
-          <div className="flex justify-center">
+        <div className="space-y-2 text-center">
+          <div className="flex justify-center mb-4">
             <div className="rounded-full bg-green-500/10 p-3">
               <CheckCircle className="h-12 w-12 text-green-400" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-white">Email verified successfully!</h1>
-          <p className="text-gray-400 leading-relaxed">
-            Your email has been successfully verified. You can now log in to your account and start building amazing
-            websites.
-          </p>
+          <h1 className="text-xl font-bold">Email verified successfully!</h1>
+          <p className="text-gray-400">Your email has been verified. You can now log in to your account.</p>
         </div>
 
         <div className="space-y-4">
@@ -148,13 +153,13 @@ export function VerifyEmail() {
     <Suspense
       fallback={
         <div className="mx-auto w-full max-w-md space-y-6">
-          <div className="space-y-4 text-center">
-            <div className="flex justify-center">
+          <div className="space-y-2 text-center">
+            <div className="flex justify-center mb-4">
               <div className="rounded-full bg-purple-500/10 p-4">
                 <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-white">Loading...</h1>
+            <h1 className="text-xl font-bold">Loading...</h1>
           </div>
         </div>
       }
