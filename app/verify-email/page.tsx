@@ -8,7 +8,7 @@ export default function VerifyEmailPage() {
         <Suspense
           fallback={
             <div className="flex justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-500 border-t-transparent"></div>
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-400 border-t-transparent"></div>
             </div>
           }
         >

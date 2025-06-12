@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { verifyEmail } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
-import { Loader2, CheckCircle, XCircle, ArrowLeft } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, ArrowLeft, Mail } from "lucide-react"
 
 // Create a separate component that uses useSearchParams
 function VerifyEmailContent() {
@@ -40,15 +40,25 @@ function VerifyEmailContent() {
   if (!token) {
     return (
       <div className="mx-auto w-full max-w-md space-y-6">
-        <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-bold">Verify your email</h1>
-          <p className="text-gray-400">
-            Please check your email for a verification link. Click the link to verify your email address.
+        <div className="space-y-4 text-center">
+          <div className="flex justify-center">
+            <div className="rounded-full bg-purple-500/10 p-3">
+              <Mail className="h-8 w-8 text-purple-400" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-white">Verify your email</h1>
+          <p className="text-gray-400 leading-relaxed">
+            Please check your email for a verification link. Click the link to verify your email address and activate
+            your account.
           </p>
         </div>
 
         <div className="space-y-4">
-          <Button asChild variant="outline" className="w-full">
+          <Button
+            asChild
+            variant="outline"
+            className="w-full border-gray-700 bg-transparent text-gray-300 hover:bg-gray-800 hover:text-white"
+          >
             <Link href="/login">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to login
@@ -62,12 +72,14 @@ function VerifyEmailContent() {
   if (isLoading) {
     return (
       <div className="mx-auto w-full max-w-md space-y-6">
-        <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-bold">Verifying your email</h1>
-          <div className="flex justify-center mt-6">
-            <Loader2 className="h-12 w-12 animate-spin text-purple-500" />
+        <div className="space-y-4 text-center">
+          <div className="flex justify-center">
+            <div className="rounded-full bg-purple-500/10 p-4">
+              <Loader2 className="h-12 w-12 animate-spin text-purple-400" />
+            </div>
           </div>
-          <p className="text-gray-400 mt-4">Please wait while we verify your email address...</p>
+          <h1 className="text-3xl font-bold text-white">Verifying your email</h1>
+          <p className="text-gray-400">Please wait while we verify your email address...</p>
         </div>
       </div>
     )
@@ -76,14 +88,22 @@ function VerifyEmailContent() {
   if (error) {
     return (
       <div className="mx-auto w-full max-w-md space-y-6">
-        <div className="space-y-2 text-center">
-          <XCircle className="h-16 w-16 text-red-500 mx-auto" />
-          <h1 className="text-3xl font-bold">Verification failed</h1>
-          <p className="text-gray-400">{error}</p>
+        <div className="space-y-4 text-center">
+          <div className="flex justify-center">
+            <div className="rounded-full bg-red-500/10 p-3">
+              <XCircle className="h-12 w-12 text-red-400" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-white">Verification failed</h1>
+          <p className="text-gray-400 leading-relaxed">{error}</p>
         </div>
 
         <div className="space-y-4">
-          <Button asChild variant="outline" className="w-full">
+          <Button
+            asChild
+            variant="outline"
+            className="w-full border-gray-700 bg-transparent text-gray-300 hover:bg-gray-800 hover:text-white"
+          >
             <Link href="/login">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to login
@@ -97,17 +117,22 @@ function VerifyEmailContent() {
   if (isVerified) {
     return (
       <div className="mx-auto w-full max-w-md space-y-6">
-        <div className="space-y-2 text-center">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
-          <h1 className="text-3xl font-bold">Email verified</h1>
-          <p className="text-gray-400">
-            Your email has been successfully verified. You can now log in to your account.
+        <div className="space-y-4 text-center">
+          <div className="flex justify-center">
+            <div className="rounded-full bg-green-500/10 p-3">
+              <CheckCircle className="h-12 w-12 text-green-400" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-white">Email verified successfully!</h1>
+          <p className="text-gray-400 leading-relaxed">
+            Your email has been successfully verified. You can now log in to your account and start building amazing
+            websites.
           </p>
         </div>
 
         <div className="space-y-4">
-          <Button asChild className="w-full bg-purple-600 hover:bg-purple-500">
-            <Link href="/login">Go to login</Link>
+          <Button asChild className="w-full bg-purple-600 hover:bg-purple-500 text-white">
+            <Link href="/login">Continue to login</Link>
           </Button>
         </div>
       </div>
@@ -123,11 +148,13 @@ export function VerifyEmail() {
     <Suspense
       fallback={
         <div className="mx-auto w-full max-w-md space-y-6">
-          <div className="space-y-2 text-center">
-            <h1 className="text-3xl font-bold">Loading...</h1>
-            <div className="flex justify-center mt-6">
-              <Loader2 className="h-12 w-12 animate-spin text-purple-500" />
+          <div className="space-y-4 text-center">
+            <div className="flex justify-center">
+              <div className="rounded-full bg-purple-500/10 p-4">
+                <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+              </div>
             </div>
+            <h1 className="text-2xl font-bold text-white">Loading...</h1>
           </div>
         </div>
       }
