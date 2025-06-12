@@ -190,7 +190,7 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = hasAccessToken && !isAccessTokenExpired
 
   // Check if refresh token exists and is not expired
-  const hasValidRefreshToken = !!refreshToken && !isTokenExpired(refreshToken)
+  const hasValidRefreshToken = !!refreshToken
 
   console.log(`Middleware: Is authenticated: ${isAuthenticated}`)
   console.log(`Middleware: Access token expired: ${isAccessTokenExpired}`)
