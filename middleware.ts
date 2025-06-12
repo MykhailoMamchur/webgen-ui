@@ -98,9 +98,9 @@ async function refreshTokens(refreshToken: string): Promise<{ accessToken: strin
     const refreshResponse = await fetch(`${apiBaseUrl}/auth/refresh`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${refreshToken}`,
+        "Content-Type": "application/json"
       },
+      credentials: "include", // Ensure cookies are sent
     })
 
     console.log(`Middleware: Backend refresh response status: ${refreshResponse.status}`)
