@@ -23,6 +23,28 @@ export const getAuthToken = (): string | null => {
   return null
 }
 
+export const getRefreshToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    // Try to get from cookie first
+    const cookies = document.cookie.split(";").reduce(
+      (acc, cookie) => {
+        const [key, value] = cookie.trim().split("=")
+        acc[key] = value
+        return acc
+      },
+      {} as Record<string, string>,
+    )
+
+    const token = cookies["refresh_token"] || null
+    console.log(`Auth: Getting refresh_token from cookies, exists: ${!!token}`)
+    if (token) {
+      console.log(`Auth: refresh_token preview: ${token.substring(0, 50)}...`)
+    }
+    return token
+  }
+  return null
+}
+
 // Helper function to check if a JWT token is expired
 export const isTokenExpired = (token: string): boolean => {
   if (!token) return true
@@ -173,6 +195,10 @@ export async function refreshToken() {
     const response = await fetch("/api/auth/refresh", {
       method: "POST",
       credentials: "include", // Include cookies in the request
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refresh_token: getRefreshToken() }), // Send current token for validation
     })
 
     console.log(`Auth: Refresh response status: ${response.status}`)
