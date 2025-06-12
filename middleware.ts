@@ -100,6 +100,7 @@ async function refreshTokens(refreshToken: string): Promise<{ accessToken: strin
       headers: {
         "Content-Type": "application/json"
       },
+      body: JSON.stringify({ refresh_token: refreshToken }),
       credentials: "include", // Ensure cookies are sent
     })
 
