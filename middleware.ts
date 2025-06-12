@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { getApiBaseUrl } from "./lib/config"
+import { getApiBaseUrl, COOKIE_DOMAIN, useSecureCookies } from "./lib/config"
 
 // Function to check if a JWT token is expired
 function isTokenExpired(token: string): boolean {
@@ -24,7 +24,7 @@ function isTokenExpired(token: string): boolean {
     const currentTime = Math.floor(Date.now() / 1000)
     return currentTime >= exp
   } catch (error) {
-    console.error("Error checking token expiration:", error)
+    console.error("Middleware: Error checking token expiration:", error)
     return true // If we can't parse the token, assume it's expired
   }
 }
@@ -52,7 +52,7 @@ function isTokenExpiringSoon(token: string): boolean {
     // Return true if token expires within 5 minutes (300 seconds)
     return timeUntilExpiry < 300
   } catch (error) {
-    console.error("Error checking token expiration:", error)
+    console.error("Middleware: Error checking token expiration:", error)
     return true
   }
 }
@@ -75,15 +75,16 @@ async function refreshTokens(refreshToken: string): Promise<{ accessToken: strin
       },
     })
 
+    console.log(`Middleware: Backend refresh response status: ${refreshResponse.status}`)
+
     if (!refreshResponse.ok) {
-      console.error("Middleware: Token refresh failed with status:", refreshResponse.status)
       const errorText = await refreshResponse.text().catch(() => "Unknown error")
-      console.error("Middleware: Token refresh error details:", errorText)
+      console.error("Middleware: Token refresh failed:", errorText)
       return null
     }
 
     const refreshData = await refreshResponse.json()
-    console.log("Middleware: Tokens refreshed successfully")
+    console.log("Middleware: Tokens refreshed successfully via backend")
 
     return {
       accessToken: refreshData.access_token,
@@ -95,9 +96,35 @@ async function refreshTokens(refreshToken: string): Promise<{ accessToken: strin
   }
 }
 
+// Function to clear authentication cookies
+function clearAuthCookies(response: NextResponse) {
+  response.cookies.set({
+    name: "access_token",
+    value: "",
+    httpOnly: true,
+    secure: useSecureCookies,
+    sameSite: "lax",
+    maxAge: 0,
+    path: "/",
+    domain: COOKIE_DOMAIN,
+  })
+
+  response.cookies.set({
+    name: "refresh_token",
+    value: "",
+    httpOnly: true,
+    secure: useSecureCookies,
+    sameSite: "lax",
+    maxAge: 0,
+    path: "/",
+    domain: COOKIE_DOMAIN,
+  })
+}
+
 export async function middleware(request: NextRequest) {
   // Get the pathname of the request
   const path = request.nextUrl.pathname
+  console.log(`Middleware: Processing request to ${path}`)
 
   // Skip middleware for API routes to avoid infinite loops
   if (path.startsWith("/api/")) {
@@ -117,6 +144,9 @@ export async function middleware(request: NextRequest) {
   const accessToken = request.cookies.get("access_token")?.value
   const refreshToken = request.cookies.get("refresh_token")?.value
 
+  console.log(`Middleware: Access token exists: ${!!accessToken}`)
+  console.log(`Middleware: Refresh token exists: ${!!refreshToken}`)
+
   // Check if access token exists and is not expired
   const hasAccessToken = !!accessToken
   const isAccessTokenExpired = hasAccessToken ? isTokenExpired(accessToken) : true
@@ -125,6 +155,10 @@ export async function middleware(request: NextRequest) {
 
   // Check if refresh token exists and is not expired
   const hasValidRefreshToken = !!refreshToken && !isTokenExpired(refreshToken)
+
+  console.log(`Middleware: Is authenticated: ${isAuthenticated}`)
+  console.log(`Middleware: Access token expired: ${isAccessTokenExpired}`)
+  console.log(`Middleware: Has valid refresh token: ${hasValidRefreshToken}`)
 
   // Only redirect authenticated users away from auth-specific public routes (not subscribe)
   if (isAuthenticated && isPublicPath && path !== "/subscribe") {
@@ -147,10 +181,11 @@ export async function middleware(request: NextRequest) {
         name: "access_token",
         value: newTokens.accessToken,
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: useSecureCookies,
         sameSite: "lax",
         maxAge: 60 * 60, // 1 hour
         path: "/",
+        domain: COOKIE_DOMAIN,
       })
 
       // Set the new refresh token cookie
@@ -158,14 +193,17 @@ export async function middleware(request: NextRequest) {
         name: "refresh_token",
         value: newTokens.refreshToken,
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: useSecureCookies,
         sameSite: "lax",
         maxAge: 60 * 60 * 24 * 7, // 7 days
         path: "/",
+        domain: COOKIE_DOMAIN,
       })
 
       console.log("Middleware: Tokens refreshed proactively, allowing request to continue")
       return response
+    } else {
+      console.log("Middleware: Proactive refresh failed, but continuing with current token")
     }
   }
 
@@ -186,40 +224,40 @@ export async function middleware(request: NextRequest) {
           name: "access_token",
           value: newTokens.accessToken,
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
+          secure: useSecureCookies,
           sameSite: "lax",
           maxAge: 60 * 60, // 1 hour
           path: "/",
+          domain: COOKIE_DOMAIN,
         })
 
-        // Set the new refresh token cookie
+        // Set the new refresh token cookie - FIXED: Added missing domain
         response.cookies.set({
           name: "refresh_token",
           value: newTokens.refreshToken,
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
+          secure: useSecureCookies,
           sameSite: "lax",
           maxAge: 60 * 60 * 24 * 7, // 7 days
           path: "/",
+          domain: COOKIE_DOMAIN, // THIS WAS THE CRITICAL MISSING PIECE!
         })
 
         console.log("Middleware: Tokens refreshed and cookies set, allowing request to continue")
         return response
       } else {
         // If refresh fails, clear cookies and redirect to login
-        console.log("Middleware: Token refresh failed, redirecting to login")
+        console.log("Middleware: Token refresh failed, clearing cookies and redirecting to login")
         const response = NextResponse.redirect(new URL("/login", request.url))
-        response.cookies.delete("access_token")
-        response.cookies.delete("refresh_token")
+        clearAuthCookies(response)
         return response
       }
     }
 
-    // If no valid refresh token, redirect to login
+    // If no valid refresh token, clear cookies and redirect to login
     console.log("Middleware: No valid authentication, redirecting to login")
     const response = NextResponse.redirect(new URL("/login", request.url))
-    response.cookies.delete("access_token")
-    response.cookies.delete("refresh_token")
+    clearAuthCookies(response)
     return response
   }
 

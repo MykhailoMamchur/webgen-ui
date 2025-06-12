@@ -3,7 +3,7 @@ import { getAuthToken } from "./auth"
 // Flag to prevent multiple simultaneous refresh requests
 let isRefreshing = false
 // Queue of callbacks to execute after token refresh
-let refreshQueue: Array<(token: string) => void> = []
+let refreshQueue: Array<(token: string | null) => void> = []
 
 // Function to refresh the token
 async function refreshAuthToken(): Promise<string | null> {
@@ -19,14 +19,29 @@ async function refreshAuthToken(): Promise<string | null> {
   isRefreshing = true
 
   try {
-    console.log("API Client: Proactively refreshing token...")
+    console.log("API Client: Attempting to refresh token...")
     const response = await fetch("/api/auth/refresh", {
       method: "POST",
       credentials: "include", // Include cookies in the request
     })
 
+    console.log(`API Client: Refresh response status: ${response.status}`)
+
     if (!response.ok) {
-      throw new Error("Failed to refresh token")
+      const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+      console.error("API Client: Token refresh failed:", errorData)
+
+      // Process the queue with null to indicate failure
+      refreshQueue.forEach((callback) => callback(null))
+      refreshQueue = []
+
+      // If refresh fails, redirect to login
+      console.log("API Client: Redirecting to login due to refresh failure")
+      if (typeof window !== "undefined") {
+        window.location.href = "/login"
+      }
+
+      return null
     }
 
     const data = await response.json()
@@ -40,11 +55,17 @@ async function refreshAuthToken(): Promise<string | null> {
 
     return newToken
   } catch (error) {
-    console.error("API Client: Token refresh failed:", error)
+    console.error("API Client: Token refresh error:", error)
 
     // Process the queue with null to indicate failure
-    refreshQueue.forEach((callback) => callback(""))
+    refreshQueue.forEach((callback) => callback(null))
     refreshQueue = []
+
+    // If refresh fails, redirect to login
+    console.log("API Client: Redirecting to login due to refresh error")
+    if (typeof window !== "undefined") {
+      window.location.href = "/login"
+    }
 
     return null
   } finally {
@@ -57,8 +78,11 @@ const REFRESH_THRESHOLD = 5 * 60 // 5 minutes
 
 // Enhanced fetch function with token refresh
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  console.log(`API Client: Making request to ${url}`)
+
   // Get the current token
   let token = getAuthToken()
+  console.log(`API Client: Current token exists: ${!!token}`)
 
   // Check if token exists and is about to expire
   if (token) {
@@ -79,9 +103,19 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
           const currentTime = Math.floor(Date.now() / 1000)
           const timeUntilExpiry = exp - currentTime
 
-          // If token will expire soon, refresh it
-          if (timeUntilExpiry < REFRESH_THRESHOLD) {
-            console.log(`API Client: Token will expire in ${timeUntilExpiry} seconds, refreshing...`)
+          console.log(`API Client: Token expires in ${timeUntilExpiry} seconds`)
+
+          // If token is expired or will expire soon, refresh it
+          if (timeUntilExpiry <= 0) {
+            console.log("API Client: Token is expired, refreshing...")
+            const newToken = await refreshAuthToken()
+            if (newToken) {
+              token = newToken
+            } else {
+              console.log("API Client: Token refresh failed, request will likely fail")
+            }
+          } else if (timeUntilExpiry < REFRESH_THRESHOLD) {
+            console.log(`API Client: Token will expire in ${timeUntilExpiry} seconds, refreshing proactively...`)
             const newToken = await refreshAuthToken()
             if (newToken) {
               token = newToken
@@ -91,7 +125,15 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
       }
     } catch (error) {
       console.error("API Client: Error checking token expiration:", error)
+      // If we can't parse the token, try to refresh it
+      console.log("API Client: Cannot parse token, attempting refresh...")
+      const newToken = await refreshAuthToken()
+      if (newToken) {
+        token = newToken
+      }
     }
+  } else {
+    console.log("API Client: No token found, request will likely fail")
   }
 
   // Prepare headers with the token
@@ -99,6 +141,8 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
     ...options.headers,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
+
+  console.log(`API Client: Making request with token: ${!!token}`)
 
   // Make the request with the token
   try {
@@ -108,9 +152,11 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
       credentials: "include",
     })
 
-    // If we get a 401 Unauthorized, try to refresh the token and retry the request
-    if (response.status === 401) {
-      console.log("API Client: Received 401, attempting token refresh...")
+    console.log(`API Client: Response status: ${response.status}`)
+
+    // If we get a 401 or 403 Unauthorized, try to refresh the token and retry the request
+    if (response.status === 401 || response.status === 403) {
+      console.log(`API Client: Received ${response.status}, attempting token refresh...`)
 
       // Try to refresh the token
       const newToken = await refreshAuthToken()
@@ -127,9 +173,8 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
           credentials: "include",
         })
       } else {
-        console.log("API Client: Token refresh failed, redirecting to login...")
-        // If refresh fails, redirect to login
-        window.location.href = "/login"
+        console.log("API Client: Token refresh failed, returning original response")
+        return response
       }
     }
 
@@ -149,7 +194,7 @@ export async function apiRequest<T>(url: string, options: RequestInit = {}): Pro
 
     try {
       const errorData = await response.json()
-      errorMessage = errorData.message || errorData.error || errorMessage
+      errorMessage = errorData.message || errorData.error || errorData.detail || errorMessage
     } catch (e) {
       // If parsing JSON fails, use the default error message
     }

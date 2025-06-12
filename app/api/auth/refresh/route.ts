@@ -3,12 +3,17 @@ import { API_BASE_URL, COOKIE_DOMAIN, useSecureCookies } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("Refresh API: Starting token refresh process...")
+
     // Get the refresh token from the cookies
     const refreshToken = request.cookies.get("refresh_token")?.value
 
     if (!refreshToken) {
+      console.log("Refresh API: No refresh token found in cookies")
       return NextResponse.json({ error: "No refresh token provided" }, { status: 401 })
     }
+
+    console.log("Refresh API: Found refresh token, calling backend...")
 
     // Forward the request to the API endpoint
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
@@ -19,17 +24,48 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    console.log(`Refresh API: Backend responded with status ${response.status}`)
+
     // If the response is not ok, throw an error
     if (!response.ok) {
-      const errorData = await response.json()
-      return NextResponse.json(
+      const errorData = await response.json().catch(() => ({ message: "Unknown error" }))
+      console.error("Refresh API: Backend refresh failed:", errorData)
+
+      // Create response to clear cookies on refresh failure
+      const errorResponse = NextResponse.json(
         { error: errorData.message || errorData.detail || `Failed to refresh token: ${response.status}` },
         { status: response.status },
       )
+
+      // Clear cookies when refresh fails
+      errorResponse.cookies.set({
+        name: "access_token",
+        value: "",
+        httpOnly: true,
+        secure: useSecureCookies,
+        sameSite: "lax",
+        maxAge: 0,
+        path: "/",
+        domain: COOKIE_DOMAIN,
+      })
+
+      errorResponse.cookies.set({
+        name: "refresh_token",
+        value: "",
+        httpOnly: true,
+        secure: useSecureCookies,
+        sameSite: "lax",
+        maxAge: 0,
+        path: "/",
+        domain: COOKIE_DOMAIN,
+      })
+
+      return errorResponse
     }
 
     // Parse the response data
     const data = await response.json()
+    console.log("Refresh API: Successfully got new tokens from backend")
 
     // Create the response object
     const apiResponse = NextResponse.json({
@@ -62,9 +98,40 @@ export async function POST(request: NextRequest) {
       domain: COOKIE_DOMAIN,
     })
 
+    console.log("Refresh API: New cookies set successfully")
     return apiResponse
   } catch (error) {
-    console.error("Error in refresh token API route:", error)
-    return NextResponse.json({ error: `Failed to refresh token: ${(error as Error).message}` }, { status: 500 })
+    console.error("Refresh API: Unexpected error:", error)
+
+    // Create response to clear cookies on unexpected error
+    const errorResponse = NextResponse.json(
+      { error: `Failed to refresh token: ${(error as Error).message}` },
+      { status: 500 },
+    )
+
+    // Clear cookies on unexpected error
+    errorResponse.cookies.set({
+      name: "access_token",
+      value: "",
+      httpOnly: true,
+      secure: useSecureCookies,
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+      domain: COOKIE_DOMAIN,
+    })
+
+    errorResponse.cookies.set({
+      name: "refresh_token",
+      value: "",
+      httpOnly: true,
+      secure: useSecureCookies,
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+      domain: COOKIE_DOMAIN,
+    })
+
+    return errorResponse
   }
 }
