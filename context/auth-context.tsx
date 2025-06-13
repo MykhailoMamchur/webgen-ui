@@ -25,6 +25,7 @@ export interface User {
   updatedAt?: string
 }
 
+// Add the confirmPasswordReset function to the AuthContextType interface
 interface AuthContextType {
   user: User | null
   isLoading: boolean
@@ -33,6 +34,7 @@ interface AuthContextType {
   signup: (email: string, password: string, passwordConfirm: string) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  confirmPasswordReset: (token: string, password: string) => Promise<void>
   updateUser: (user: Partial<User>) => void
   refreshUserToken: () => Promise<boolean>
 }
@@ -255,6 +257,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Add the confirmPasswordReset function implementation in the AuthProvider
+  // Add this function after the handleResetPassword function
+  // Reset password confirmation function
+  const handleConfirmPasswordReset = async (token: string, password: string) => {
+    try {
+      setIsLoading(true)
+      const response = await fetch("/api/auth/confirm-reset", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token, password }),
+        credentials: "include", // Include cookies in the request
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || errorData.message || "Could not reset password")
+      }
+
+      // Show success toast
+      toast({
+        title: "Password updated",
+        description: "Your password has been reset successfully",
+        variant: "success",
+      })
+
+      return await response.json()
+    } catch (error: any) {
+      console.error("Password reset confirmation error:", error)
+      toast({
+        title: "Password reset failed",
+        description: error.message || "Could not reset your password",
+        variant: "error",
+      })
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Update user function
   const updateUser = (updatedUserData: Partial<User>) => {
     if (user) {
@@ -262,7 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Create context value
+  // Update the contextValue to include the new function
   const contextValue: AuthContextType = {
     user,
     isLoading,
@@ -271,6 +314,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signup: handleSignup,
     logout: handleLogout,
     resetPassword: handleResetPassword,
+    confirmPasswordReset: handleConfirmPasswordReset,
     updateUser,
     refreshUserToken,
   }

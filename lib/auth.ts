@@ -183,6 +183,25 @@ export async function resetPassword(email: string) {
   return await response.json()
 }
 
+// Confirm password reset
+export async function confirmPasswordReset(token: string, password: string) {
+  const response = await fetch("/api/auth/confirm-reset", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ token, password }),
+    credentials: "include", // Include cookies in the request
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || errorData.message || "Failed to reset password")
+  }
+
+  return await response.json()
+}
+
 // Get current user
 export async function getCurrentUser() {
   return apiGet("/api/auth/me")

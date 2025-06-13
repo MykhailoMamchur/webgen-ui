@@ -98,7 +98,7 @@ async function refreshTokens(refreshToken: string): Promise<{ accessToken: strin
     const refreshResponse = await fetch(`${apiBaseUrl}/auth/refresh`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ refresh_token: refreshToken }),
       credentials: "include", // Ensure cookies are sent
@@ -166,6 +166,7 @@ export async function middleware(request: NextRequest) {
     path === "/login" ||
     path === "/signup" ||
     path === "/reset-password" ||
+    path === "/new-password" ||
     path === "/verify-email" ||
     path === "/resend-verification" ||
     path === "/subscribe"
