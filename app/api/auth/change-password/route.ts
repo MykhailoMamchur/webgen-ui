@@ -9,8 +9,11 @@ export async function POST(request: NextRequest) {
     const accessToken =
       request.cookies.get("access_token")?.value || request.headers.get("Authorization")?.replace("Bearer ", "")
 
-    if (!accessToken) {
-      return NextResponse.json({ error: "No access token provided" }, { status: 401 })
+    const refreshToken =
+      request.cookies.get("refresh_token")?.value || request.headers.get("Authorization")?.replace("Bearer ", "")
+
+    if (!accessToken || !refreshToken) {
+      return NextResponse.json({ error: "No tokens provided" }, { status: 401 })
     }
 
     if (!body.new_password) {
@@ -21,11 +24,12 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         new_password: body.new_password,
+        access_token: accessToken,
+        refresh_token: refreshToken
       }),
     })
 
