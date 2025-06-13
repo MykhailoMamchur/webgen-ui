@@ -169,7 +169,8 @@ export async function middleware(request: NextRequest) {
     path === "/new-password" ||
     path === "/verify-email" ||
     path === "/resend-verification" ||
-    path === "/subscribe"
+    path === "/subscribe" ||
+    path === "/auth" // Add the new auth redirect path
 
   // Check if user is authenticated
   const accessToken = request.cookies.get("access_token")?.value
@@ -198,8 +199,8 @@ export async function middleware(request: NextRequest) {
   console.log(`Middleware: Access token expired: ${isAccessTokenExpired}`)
   console.log(`Middleware: Has valid refresh token: ${hasValidRefreshToken}`)
 
-  // Only redirect authenticated users away from auth-specific public routes (not subscribe)
-  if (isAuthenticated && isPublicPath && path !== "/subscribe") {
+  // Only redirect authenticated users away from auth-specific public routes (not subscribe or auth)
+  if (isAuthenticated && isPublicPath && path !== "/subscribe" && path !== "/auth") {
     console.log("Middleware: Redirecting authenticated user away from public route")
     return NextResponse.redirect(new URL("/", request.url))
   }

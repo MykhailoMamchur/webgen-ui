@@ -3,28 +3,30 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Sparkles } from "lucide-react"
-import { NewPasswordForm } from "@/components/auth/new-password-form"
-import { parseHashParams } from "@/lib/utils"
+import NewPasswordForm from "@/components/auth/new-password-form"
 
 export default function NewPasswordPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
-  const [recoveryToken, setRecoveryToken] = useState<string | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Parse the URL hash fragment to extract tokens
-    if (typeof window !== "undefined") {
-      const hashParams = parseHashParams(window.location.hash)
+    // Check for access token in cookies
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`
+      const parts = value.split(`; ${name}=`)
+      if (parts.length === 2) return parts.pop()?.split(";").shift() || null
+      return null
+    }
 
-      if (hashParams.access_token && hashParams.type === "recovery") {
-        setRecoveryToken(hashParams.access_token)
-        // Clear the hash from the URL for security
-        window.history.replaceState({}, document.title, window.location.pathname)
-      } else {
-        setError("Invalid or missing recovery token. Please request a new password reset link.")
-      }
+    const token = getCookie("access_token")
 
+    if (token) {
+      setAccessToken(token)
+      setIsLoading(false)
+    } else {
+      setError("No authentication token found. Please request a new password reset link.")
       setIsLoading(false)
     }
   }, [])
@@ -65,7 +67,7 @@ export default function NewPasswordPage() {
               </button>
             </div>
           ) : (
-            <NewPasswordForm recoveryToken={recoveryToken!} />
+            <NewPasswordForm accessToken={accessToken!} />
           )}
         </div>
       </div>

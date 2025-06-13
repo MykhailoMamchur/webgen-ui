@@ -19,7 +19,9 @@ export function parseHashParams(hash: string): Record<string, string> {
   // Split by & and create an object of key-value pairs
   return hashContent.split("&").reduce((result: Record<string, string>, item: string) => {
     const [key, value] = item.split("=")
-    result[key] = decodeURIComponent(value)
+    if (key && value) {
+      result[key] = decodeURIComponent(value)
+    }
     return result
   }, {})
 }
