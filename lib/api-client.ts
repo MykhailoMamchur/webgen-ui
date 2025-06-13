@@ -1,4 +1,5 @@
 import { getAuthToken } from "./auth"
+import { TOKEN_EXPIRY, useSecureCookies, COOKIE_DOMAIN } from "./config"
 
 // Flag to prevent multiple simultaneous refresh requests
 let isRefreshing = false
@@ -45,15 +46,31 @@ async function refreshAuthToken(): Promise<string | null> {
     }
 
     const data = await response.json()
-    const newToken = data.access_token
+    const newAccessToken = data.access_token
+    const newRefreshToken = data.refresh_token
 
     console.log("API Client: Token refreshed successfully")
 
-    // Process the queue with the new token
-    refreshQueue.forEach((callback) => callback(newToken))
+    // Set both access_token and refresh_token cookies if they exist
+    if (typeof document !== "undefined") {
+      if (newAccessToken) {
+        const accessTokenCookie = `access_token=${newAccessToken}; Max-Age=${TOKEN_EXPIRY}; Path=/; ${useSecureCookies ? "Secure; " : ""}HttpOnly; SameSite=Lax${COOKIE_DOMAIN ? `; Domain=${COOKIE_DOMAIN}` : ""}`
+        document.cookie = accessTokenCookie
+        console.log("API Client: Set new access_token cookie")
+      }
+
+      if (newRefreshToken) {
+        const refreshTokenCookie = `refresh_token=${newRefreshToken}; Max-Age=${TOKEN_EXPIRY}; Path=/; ${useSecureCookies ? "Secure; " : ""}HttpOnly; SameSite=Lax${COOKIE_DOMAIN ? `; Domain=${COOKIE_DOMAIN}` : ""}`
+        document.cookie = refreshTokenCookie
+        console.log("API Client: Set new refresh_token cookie")
+      }
+    }
+
+    // Process the queue with the new access token
+    refreshQueue.forEach((callback) => callback(newAccessToken))
     refreshQueue = []
 
-    return newToken
+    return newAccessToken
   } catch (error) {
     console.error("API Client: Token refresh error:", error)
 

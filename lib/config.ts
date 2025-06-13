@@ -13,6 +13,9 @@ export const API_BASE_URL = isProduction ? "https://usemanufactura.com/api" : "h
 export const COOKIE_DOMAIN = isProduction ? ".usemanufactura.com" : undefined
 export const useSecureCookies = isProduction
 
+// Token expiration time in seconds (3 days)
+export const TOKEN_EXPIRY = 259200
+
 // Log the environment and API base URL during startup
 console.log(`Environment: ${isProduction ? "Production" : "Development"}`)
 console.log(`API Base URL: ${API_BASE_URL}`)
@@ -23,4 +26,5 @@ export const getApiBaseUrl = () => API_BASE_URL
 export const PADDLE_ENVIRONMENT = "production" //"sandbox"
 export const PADDLE_CLIENT_TOKEN = "live_69ae6bd301189aa5e56aba29f57" //"test_3c827e906e240be60606966e954"
 export const PADDLE_SUBSCRIPTION_PRICE_ID = "pri_01jvd8zchk1smxtf38wq33vney" //"pri_01jwr8we80tpewr9exarwp6694"
+
 export const PADDLE_SUCCESS_URL = "https://app.usemanufactura.com/?upgrade_success=true"
