@@ -166,7 +166,6 @@ export async function middleware(request: NextRequest) {
     path === "/login" ||
     path === "/signup" ||
     path === "/reset-password" ||
-    path === "/new-password" ||
     path === "/verify-email" ||
     path === "/resend-verification" ||
     path === "/subscribe" ||
