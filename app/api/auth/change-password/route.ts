@@ -6,20 +6,27 @@ export async function POST(request: NextRequest) {
     // Get the request body
     const body = await request.json()
 
+    // Get the authorization header
+    const authHeader = request.headers.get("Authorization")
+
     // Ensure required fields are provided
-    if (!body.token || !body.password) {
-      return NextResponse.json({ error: "Token and password are required" }, { status: 400 })
+    if (!authHeader) {
+      return NextResponse.json({ error: "Authorization header is required" }, { status: 401 })
+    }
+
+    if (!body.new_password) {
+      return NextResponse.json({ error: "New password is required" }, { status: 400 })
     }
 
     // Forward the request to the API endpoint
-    const response = await fetch(`${API_BASE_URL}/auth/confirm-reset`, {
+    const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: authHeader,
       },
       body: JSON.stringify({
-        token: body.token,
-        password: body.password,
+        new_password: body.new_password,
       }),
     })
 
@@ -27,7 +34,7 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       const errorData = await response.json()
       return NextResponse.json(
-        { error: errorData.message || errorData.detail || `Failed to confirm password reset: ${response.status}` },
+        { error: errorData.message || errorData.detail || `Failed to change password: ${response.status}` },
         { status: response.status },
       )
     }
@@ -38,10 +45,7 @@ export async function POST(request: NextRequest) {
     // Return the response
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in confirm password reset API route:", error)
-    return NextResponse.json(
-      { error: `Failed to confirm password reset: ${(error as Error).message}` },
-      { status: 500 },
-    )
+    console.error("Error in change password API route:", error)
+    return NextResponse.json({ error: `Failed to change password: ${(error as Error).message}` }, { status: 500 })
   }
 }

@@ -71,20 +71,20 @@ export default function NewPasswordForm({ accessToken }: NewPasswordFormProps) {
     setIsLoading(true)
 
     try {
-      const response = await fetch("/api/auth/confirm-reset", {
+      const response = await fetch("/api/auth/change-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          access_token: accessToken,
-          password: data.password,
+          new_password: data.password,
         }),
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to reset password")
+        throw new Error(errorData.error || "Failed to reset password")
       }
 
       toast({
