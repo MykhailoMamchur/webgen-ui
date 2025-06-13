@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { API_BASE_URL, COOKIE_DOMAIN, useSecureCookies, TOKEN_EXPIRY } from "@/lib/config"
+import { API_BASE_URL, COOKIE_DOMAIN, useSecureCookies, TOKEN_EXPIRY, REFRESH_TOKEN_EXPIRY } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   try {
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: useSecureCookies,
       sameSite: "lax",
-      maxAge: TOKEN_EXPIRY, // 3 days
+      maxAge: REFRESH_TOKEN_EXPIRY, // 30 days
       path: "/",
       domain: COOKIE_DOMAIN,
     })

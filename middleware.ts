@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { getApiBaseUrl, COOKIE_DOMAIN, useSecureCookies, TOKEN_EXPIRY } from "./lib/config"
+import { getApiBaseUrl, COOKIE_DOMAIN, useSecureCookies, TOKEN_EXPIRY, REFRESH_TOKEN_EXPIRY } from "./lib/config"
 
 // Function to check if a JWT token is expired
 function isTokenExpired(token: string): boolean {
@@ -233,7 +233,7 @@ export async function middleware(request: NextRequest) {
         httpOnly: true,
         secure: useSecureCookies,
         sameSite: "lax",
-        maxAge: TOKEN_EXPIRY, // 3 days
+        maxAge: REFRESH_TOKEN_EXPIRY, // 30 days
         path: "/",
         domain: COOKIE_DOMAIN,
       })
@@ -276,7 +276,7 @@ export async function middleware(request: NextRequest) {
           httpOnly: true,
           secure: useSecureCookies,
           sameSite: "lax",
-          maxAge: TOKEN_EXPIRY, // 3 days
+          maxAge: REFRESH_TOKEN_EXPIRY, // 30 days
           path: "/",
           domain: COOKIE_DOMAIN,
         })

@@ -1,5 +1,5 @@
 import { getAuthToken } from "./auth"
-import { TOKEN_EXPIRY, useSecureCookies, COOKIE_DOMAIN } from "./config"
+import { TOKEN_EXPIRY, REFRESH_TOKEN_EXPIRY, useSecureCookies, COOKIE_DOMAIN } from "./config"
 
 // Flag to prevent multiple simultaneous refresh requests
 let isRefreshing = false
@@ -60,7 +60,7 @@ async function refreshAuthToken(): Promise<string | null> {
       }
 
       if (newRefreshToken) {
-        const refreshTokenCookie = `refresh_token=${newRefreshToken}; Max-Age=${TOKEN_EXPIRY}; Path=/; ${useSecureCookies ? "Secure; " : ""}HttpOnly; SameSite=Lax${COOKIE_DOMAIN ? `; Domain=${COOKIE_DOMAIN}` : ""}`
+        const refreshTokenCookie = `refresh_token=${newRefreshToken}; Max-Age=${REFRESH_TOKEN_EXPIRY}; Path=/; ${useSecureCookies ? "Secure; " : ""}HttpOnly; SameSite=Lax${COOKIE_DOMAIN ? `; Domain=${COOKIE_DOMAIN}` : ""}`
         document.cookie = refreshTokenCookie
         console.log("API Client: Set new refresh_token cookie")
       }
