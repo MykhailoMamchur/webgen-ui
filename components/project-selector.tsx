@@ -16,6 +16,7 @@ interface ProjectSelectorProps {
   onDeleteProject?: (projectId: string) => void
   onRenameProject?: (projectId: string, newName: string) => void
   isGenerating?: boolean
+  refreshProjects?: () => Promise<void> // Add this new prop
 }
 
 export default function ProjectSelector({
@@ -26,6 +27,7 @@ export default function ProjectSelector({
   onDeleteProject,
   onRenameProject,
   isGenerating = false,
+  refreshProjects, // Add this new prop
 }: ProjectSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -72,7 +74,17 @@ export default function ProjectSelector({
       <Button
         variant="ghost"
         className={`flex items-center gap-2 text-white hover:bg-purple-500/10 px-3 py-2 h-auto ${isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
-        onClick={() => !isGenerating && setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isGenerating) {
+            // Refresh projects when opening the dropdown
+            if (!isOpen && refreshProjects) {
+              refreshProjects().catch((error) => {
+                console.error("Failed to refresh projects:", error)
+              })
+            }
+            setIsOpen(!isOpen)
+          }
+        }}
         disabled={isGenerating}
       >
         <span className="font-medium truncate max-w-[150px]">{currentProject?.name || "Select Project"}</span>

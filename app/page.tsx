@@ -423,6 +423,60 @@ function HomeContent() {
     setActiveTab(tabId)
   }
 
+  // Add a function to fetch the latest projects from the API
+  // Add this function to the HomeContent component
+  const refreshProjects = async () => {
+    if (!isAuthenticated || isLoading) return
+
+    try {
+      const response = await fetch("/api/projects", {
+        credentials: "include", // Include cookies in the request
+        cache: "no-store", // Ensure we don't get cached results
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch projects: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.projects && Array.isArray(data.projects)) {
+        // Convert project data to Project objects using the new format
+        const projectsFromAPI = data.projects.map((project: any) => ({
+          id: project.id, // Use the server-provided ID
+          name: project.name,
+          description: `Project ${project.name}`,
+          createdAt: new Date(project.created_at),
+          updatedAt: new Date(project.created_at), // Use created_at as updatedAt for now
+          projectName: project.name, // Use name as projectName
+          websiteContent: DEFAULT_HTML,
+          codeContent: DEFAULT_HTML,
+          messages: [],
+          // Add any other properties from the API response
+          created_timestamp: project.created_timestamp,
+        }))
+
+        // Preserve the content and messages of existing projects
+        const updatedProjects = projectsFromAPI.map((newProject) => {
+          const existingProject = projects.find((p) => p.id === newProject.id)
+          if (existingProject) {
+            return {
+              ...newProject,
+              websiteContent: existingProject.websiteContent,
+              codeContent: existingProject.codeContent,
+              messages: existingProject.messages,
+            }
+          }
+          return newProject
+        })
+
+        setProjects(updatedProjects)
+      }
+    } catch (error) {
+      console.error("Error refreshing projects:", error)
+    }
+  }
+
   // Update the useEffect to handle the new projects response format
   // Update the useEffect to load projects from the API
   useEffect(() => {
@@ -1408,6 +1462,7 @@ function HomeContent() {
         isGenerating={isGenerating}
         onDeploy={handleDeploy}
         onOpenPrompts={handleOpenPrompts}
+        refreshProjects={refreshProjects} // Add this prop
       />
 
       {/* Low edits warning banner */}

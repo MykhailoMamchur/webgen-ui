@@ -30,6 +30,7 @@ interface HeaderProps {
   isGenerating?: boolean
   onDeploy?: () => void
   onOpenPrompts?: () => void
+  refreshProjects?: () => Promise<void> // Add this new prop
 }
 
 interface UserData {
@@ -48,6 +49,7 @@ export default function Header({
   isGenerating = false,
   onDeploy,
   onOpenPrompts,
+  refreshProjects, // Add this new prop
 }: HeaderProps) {
   const [isPromptsModalOpen, setIsPromptsModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -186,6 +188,7 @@ export default function Header({
             onDeleteProject={onDeleteProject}
             onRenameProject={onRenameProject}
             isGenerating={isGenerating}
+            refreshProjects={refreshProjects} // Pass the prop here
           />
         </div>
 

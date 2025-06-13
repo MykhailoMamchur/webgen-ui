@@ -17,7 +17,9 @@ export async function GET(request: NextRequest) {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`, // Ensure proper format with space after Bearer
+        "Cache-Control": "no-cache", // Add cache control header
       },
+      cache: "no-store", // Ensure we don't get cached results
     })
 
     // If the response is not ok, throw an error
@@ -28,13 +30,27 @@ export async function GET(request: NextRequest) {
 
     // Return the response directly
     const data = await response.json()
-    return NextResponse.json({ ...data, authenticated: true })
+
+    // Add cache control headers to the response
+    return NextResponse.json(
+      { ...data, authenticated: true },
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+        },
+      },
+    )
   } catch (error) {
     console.error("Error in projects API route:", error)
     // Return empty projects array instead of error status
     return NextResponse.json(
       { error: `Failed to fetch projects: ${(error as Error).message}`, projects: [], authenticated: false },
-      { status: 200 }, // Return 200 instead of 500 to handle gracefully
+      {
+        status: 200, // Return 200 instead of 500 to handle gracefully
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+        },
+      },
     )
   }
 }
