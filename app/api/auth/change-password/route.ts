@@ -6,12 +6,11 @@ export async function POST(request: NextRequest) {
     // Get the request body
     const body = await request.json()
 
-    // Get the authorization header
-    const authHeader = request.headers.get("Authorization")
+    const accessToken =
+      request.cookies.get("access_token")?.value || request.headers.get("Authorization")?.replace("Bearer ", "")
 
-    // Ensure required fields are provided
-    if (!authHeader) {
-      return NextResponse.json({ error: "Authorization header is required" }, { status: 401 })
+    if (!accessToken) {
+      return NextResponse.json({ error: "No access token provided" }, { status: 401 })
     }
 
     if (!body.new_password) {
@@ -23,7 +22,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: authHeader,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         new_password: body.new_password,
