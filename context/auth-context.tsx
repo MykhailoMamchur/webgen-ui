@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
 import { loginUser, registerUser, logoutUser, resetPassword, getCurrentUser, confirmPasswordReset } from "@/lib/auth"
@@ -35,31 +35,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const router = useRouter()
   const pathname = usePathname()
+  const isLoggingOut = useRef(false)
 
   // Simplified auth check - just try to get current user
   useEffect(() => {
+    // Skip auth check if currently logging out
+    if (isLoggingOut.current) {
+      console.log("Auth check skipped - logout in progress")
+      return
+    }
+
     const checkAuth = async () => {
       try {
+        console.log(`Auth check starting for pathname: ${pathname}`)
         setIsLoading(true)
 
         // Skip auth check for public routes
         const isPublicPath = ["/signup", "/login", "/reset-password", "/verify-email", "/subscribe"].includes(pathname)
 
         if (isPublicPath) {
+          console.log("Public path detected, skipping auth check")
           setUser(null)
           setIsLoading(false)
           return
         }
 
         // Try to get current user - middleware handles token validation/refresh
+        console.log("Attempting to get current user...")
         const userData = await getCurrentUser()
+        console.log("User data retrieved successfully:", userData.email)
         setUser(userData)
       } catch (error) {
         console.error("Authentication error:", error)
         setUser(null)
 
-        // Redirect to login if not on public route
+        // Only redirect to login if not already on a public route
         if (!["/signup", "/login", "/reset-password", "/verify-email"].includes(pathname)) {
+          console.log("Redirecting to login due to auth failure")
           router.push("/login")
         }
       } finally {
@@ -72,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleLogin = async (email: string, password: string) => {
     try {
+      console.log("Login attempt starting...")
       setIsLoading(true)
       const { user } = await loginUser(email, password)
       setUser(user)
@@ -84,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       router.push("/")
     } catch (error: any) {
+      console.error("Login error:", error)
       toast({
         title: "Login failed",
         description: error.message || "Invalid email or password",
@@ -97,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleSignup = async (email: string, password: string, passwordConfirm: string) => {
     try {
+      console.log("Signup attempt starting...")
       setIsLoading(true)
       const { user } = await registerUser(email, password, passwordConfirm)
       setUser(user)
@@ -109,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       router.push("/")
     } catch (error: any) {
+      console.error("Signup error:", error)
       toast({
         title: "Registration failed",
         description: error.message || "Could not create your account",
@@ -122,7 +138,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     try {
+      console.log("Logout attempt starting...")
+      isLoggingOut.current = true
       setIsLoading(true)
+
       await logoutUser()
       setUser(null)
 
@@ -132,8 +151,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         variant: "success",
       })
 
+      console.log("Logout successful, redirecting to login...")
       router.push("/login")
     } catch (error: any) {
+      console.error("Logout error:", error)
       toast({
         title: "Logout failed",
         description: error.message || "Could not log you out",
@@ -141,11 +162,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
     } finally {
       setIsLoading(false)
+      // Reset logout flag after a delay to allow navigation to complete
+      setTimeout(() => {
+        isLoggingOut.current = false
+      }, 1000)
     }
   }
 
   const handleResetPassword = async (email: string) => {
     try {
+      console.log("Password reset attempt starting...")
       setIsLoading(true)
       await resetPassword(email)
 
@@ -157,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       router.push("/login")
     } catch (error: any) {
+      console.error("Password reset error:", error)
       toast({
         title: "Password reset failed",
         description: error.message || "Could not send password reset email",
@@ -170,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleConfirmPasswordReset = async (token: string, password: string) => {
     try {
+      console.log("Password reset confirmation starting...")
       setIsLoading(true)
       await confirmPasswordReset(token, password)
 
@@ -179,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         variant: "success",
       })
     } catch (error: any) {
+      console.error("Password reset confirmation error:", error)
       toast({
         title: "Password reset failed",
         description: error.message || "Could not reset your password",
