@@ -58,7 +58,7 @@ export default function Header({
   const [showPromptManagement, setShowPromptManagement] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { logout } = useAuth()
+  const { logout, isLoading } = useAuth()
 
   // Check for prompt management visibility cookie
   useEffect(() => {
@@ -110,10 +110,17 @@ export default function Header({
   }
 
   const handleSignOut = async () => {
+    // Prevent multiple logout attempts
+    if (isLoading) {
+      console.log("Logout already in progress, ignoring...")
+      return
+    }
+
     try {
+      console.log("Header: Sign out clicked")
       await logout()
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("Header: Error signing out:", error)
       // Fallback redirect if logout fails
       router.push("/login")
     }
@@ -308,6 +315,7 @@ export default function Header({
             <DropdownMenuItem
               className="text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer py-2.5"
               onClick={handleSignOut}
+              disabled={isLoading} // Add this line
             >
               <LogOut className="h-4 w-4 mr-3" />
               <span>Sign Out</span>
