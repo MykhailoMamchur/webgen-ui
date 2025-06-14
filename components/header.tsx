@@ -16,9 +16,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import ProjectSelector from "@/components/project-selector"
 import type { ProjectSummary } from "@/types/project"
 import PromptsModal from "@/components/prompts-modal"
-import { logoutUser } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/context/auth-context"
 
 interface HeaderProps {
   currentProject: ProjectSummary | null
@@ -58,6 +58,7 @@ export default function Header({
   const [showPromptManagement, setShowPromptManagement] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const { logout } = useAuth()
 
   // Check for prompt management visibility cookie
   useEffect(() => {
@@ -110,10 +111,11 @@ export default function Header({
 
   const handleSignOut = async () => {
     try {
-      await logoutUser()
-      router.push("/login")
+      await logout()
     } catch (error) {
       console.error("Error signing out:", error)
+      // Fallback redirect if logout fails
+      router.push("/login")
     }
   }
 
