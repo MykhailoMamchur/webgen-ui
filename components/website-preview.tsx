@@ -51,7 +51,7 @@ export default function WebsitePreview({
   // Add refs to prevent duplicate requests
   const requestInProgressRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const hasInitializedRef = useRef(false)
+  const currentProjectIdRef = useRef<string | null>(null)
 
   // Update the getDeploymentAlias function to use projectId and handle 503
   const getDeploymentAlias = async (useColdStart = false) => {
@@ -151,28 +151,35 @@ export default function WebsitePreview({
     }
   }, [content])
 
-  // Single consolidated effect to handle all initialization and project changes
+  // Effect to handle tab activation (only runs once)
   useEffect(() => {
-    console.log("Effect triggered - projectId:", projectId, "isGenerating:", isGenerating)
-
-    // Notify parent when this tab is activated (only on first mount)
-    if (onTabActivated && !hasInitializedRef.current) {
+    if (onTabActivated) {
       onTabActivated()
     }
+  }, [onTabActivated])
 
-    // Reset state when projectId changes or on initial mount
-    if (projectId) {
-      // If this is a different project, reset everything
-      const isDifferentProject = hasInitializedRef.current && deploymentAlias
+  // Effect to handle project changes and initialization
+  useEffect(() => {
+    console.log("Project effect triggered - projectId:", projectId, "isGenerating:", isGenerating)
 
-      if (isDifferentProject) {
-        console.log("Project changed, resetting state")
-        setDeploymentAlias(null)
-        setError(null)
-        setIframeLoaded(false)
-        setSelectedElements([])
-        setIsBooting(false)
-      }
+    // If no projectId, don't do anything
+    if (!projectId) return
+
+    // Check if this is a new project
+    const isNewProject = currentProjectIdRef.current !== projectId
+
+    if (isNewProject) {
+      console.log("New project detected, resetting state")
+
+      // Update the current project ref
+      currentProjectIdRef.current = projectId
+
+      // Reset all state for new project
+      setDeploymentAlias(null)
+      setError(null)
+      setIframeLoaded(false)
+      setSelectedElements([])
+      setIsBooting(false)
 
       // Cancel any ongoing requests
       if (abortControllerRef.current) {
@@ -196,10 +203,9 @@ export default function WebsitePreview({
         }
       }
 
-      // Make request if we don't have an alias and aren't generating
-      if (!isGenerating && !deploymentAlias && !requestInProgressRef.current) {
-        console.log("Making deployment alias request for project:", projectId)
-        hasInitializedRef.current = true
+      // Make request for new project if not generating
+      if (!isGenerating) {
+        console.log("Making deployment alias request for new project:", projectId)
         getDeploymentAlias()
       }
     }
@@ -216,7 +222,7 @@ export default function WebsitePreview({
         abortControllerRef.current.abort()
       }
     }
-  }, [projectId, isGenerating, deploymentAlias]) // Include deploymentAlias to prevent unnecessary requests
+  }, [projectId, isGenerating]) // Only depend on projectId and isGenerating
 
   // Handle iframe content for placeholder
   useEffect(() => {
@@ -613,7 +619,6 @@ export default function WebsitePreview({
   const handleRetryBoot = () => {
     setError(null)
     setIsBooting(false)
-    // Don't reset hasInitializedRef here to prevent duplicate requests
     getDeploymentAlias()
   }
 
