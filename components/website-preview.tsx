@@ -151,63 +151,62 @@ export default function WebsitePreview({
     }
   }, [content])
 
-  // Single effect to handle tab activation and initial load
+  // Single consolidated effect to handle all initialization and project changes
   useEffect(() => {
-    // Notify parent when this tab is activated
-    if (onTabActivated) {
+    console.log("Effect triggered - projectId:", projectId, "isGenerating:", isGenerating)
+
+    // Notify parent when this tab is activated (only on first mount)
+    if (onTabActivated && !hasInitializedRef.current) {
       onTabActivated()
     }
 
-    // Only make request if we haven't initialized for this project yet
-    if (projectId && !isGenerating && !deploymentAlias && !isLoading && !hasInitializedRef.current) {
-      console.log("Initializing deployment alias request for project:", projectId)
-      hasInitializedRef.current = true
-      getDeploymentAlias()
-    }
-  }, []) // Empty dependency array - only run on mount
+    // Reset state when projectId changes or on initial mount
+    if (projectId) {
+      // If this is a different project, reset everything
+      const isDifferentProject = hasInitializedRef.current && deploymentAlias
 
-  // Separate effect to handle project changes
-  useEffect(() => {
-    // Reset state when projectId changes
-    console.log("Project changed to:", projectId)
-    setDeploymentAlias(null)
-    setError(null)
-    setIframeLoaded(false)
-    setSelectedElements([])
-    setIsBooting(false)
-    hasInitializedRef.current = false
-
-    // Cancel any ongoing requests
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
-    requestInProgressRef.current = false
-
-    // Clear any selection overlays in the current iframe before changing
-    if (iframeRef.current && iframeRef.current.contentWindow) {
-      try {
-        iframeRef.current.contentWindow.postMessage({ action: "clearSelections" }, "*")
-        // If selection mode was active, disable it
-        if (isSelectionMode) {
-          iframeRef.current.contentWindow.postMessage({ action: "disableSelectionMode" }, "*")
-          setIsSelectionMode(false)
-        }
-      } catch (error) {
-        // Ignore errors during cleanup
-        console.log("Cleanup error (safe to ignore):", error)
+      if (isDifferentProject) {
+        console.log("Project changed, resetting state")
+        setDeploymentAlias(null)
+        setError(null)
+        setIframeLoaded(false)
+        setSelectedElements([])
+        setIsBooting(false)
       }
-    }
 
-    // Get deployment alias for this projectId, but ONLY if not generating
-    if (projectId && !isGenerating) {
-      console.log("Making deployment alias request for new project:", projectId)
-      hasInitializedRef.current = true
-      getDeploymentAlias()
+      // Cancel any ongoing requests
+      if (abortControllerRef.current) {
+        console.log("Cancelling previous request")
+        abortControllerRef.current.abort()
+      }
+      requestInProgressRef.current = false
+
+      // Clear any selection overlays in the current iframe before changing
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        try {
+          iframeRef.current.contentWindow.postMessage({ action: "clearSelections" }, "*")
+          // If selection mode was active, disable it
+          if (isSelectionMode) {
+            iframeRef.current.contentWindow.postMessage({ action: "disableSelectionMode" }, "*")
+            setIsSelectionMode(false)
+          }
+        } catch (error) {
+          // Ignore errors during cleanup
+          console.log("Cleanup error (safe to ignore):", error)
+        }
+      }
+
+      // Make request if we don't have an alias and aren't generating
+      if (!isGenerating && !deploymentAlias && !requestInProgressRef.current) {
+        console.log("Making deployment alias request for project:", projectId)
+        hasInitializedRef.current = true
+        getDeploymentAlias()
+      }
     }
 
     // Cleanup function
     return () => {
-      // Clean up any iframe-related resources when unmounting or changing projectId
+      // Clean up any iframe-related resources when unmounting
       if (iframeRef.current) {
         // Remove src to stop any ongoing requests
         iframeRef.current.src = "about:blank"
@@ -217,7 +216,7 @@ export default function WebsitePreview({
         abortControllerRef.current.abort()
       }
     }
-  }, [projectId, isGenerating]) // Only depend on projectId and isGenerating
+  }, [projectId, isGenerating, deploymentAlias]) // Include deploymentAlias to prevent unnecessary requests
 
   // Handle iframe content for placeholder
   useEffect(() => {
@@ -614,7 +613,7 @@ export default function WebsitePreview({
   const handleRetryBoot = () => {
     setError(null)
     setIsBooting(false)
-    hasInitializedRef.current = false
+    // Don't reset hasInitializedRef here to prevent duplicate requests
     getDeploymentAlias()
   }
 
