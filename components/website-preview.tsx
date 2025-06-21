@@ -47,11 +47,9 @@ export default function WebsitePreview({
   const [iframeLoaded, setIframeLoaded] = useState(false)
   // Add state for booting modal
   const [isBooting, setIsBooting] = useState(false)
-  const [bootStartTime, setBootStartTime] = useState<number | null>(null)
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Update the getDeploymentAlias function to use projectId and handle 503
-  const getDeploymentAlias = async (forceStart = false) => {
+  const getDeploymentAlias = async (useColdStart = false) => {
     if (!projectId || isGenerating) return // Use projectId instead of projectName
 
     try {
@@ -66,31 +64,21 @@ export default function WebsitePreview({
         },
         body: JSON.stringify({
           project_id: projectId,
-          alias_type: "dev",
-          ...(forceStart && { force_start: true }),
+          alias_type: useColdStart ? "cold_start" : "dev",
         }),
         credentials: "include", // Include cookies in the request
       })
 
       // Handle 503 - Project is booting up
-      if (response.status === 503) {
-        if (!forceStart) {
-          // First 503 - show booting modal and make force start request
-          setIsBooting(true)
-          setBootStartTime(Date.now())
-          setIsLoading(false)
+      if (response.status === 503 && !useColdStart) {
+        // First 503 - show booting modal and make cold start request
+        setIsBooting(true)
+        setIsLoading(false)
 
-          // Make force start request
-          console.log("Project is booting up, sending force start request...")
-          await getDeploymentAlias(true)
-          return
-        } else {
-          // Force start request also returned 503, start polling
-          console.log("Force start initiated, starting boot polling...")
-          setIsLoading(false)
-          startBootPolling()
-          return
-        }
+        console.log("Project is booting up, sending cold start request...")
+        // Make cold start request and wait for response
+        await getDeploymentAlias(true)
+        return
       }
 
       // Check if the response is JSON before trying to parse it
@@ -118,73 +106,10 @@ export default function WebsitePreview({
     } catch (error) {
       console.error("Error getting deployment alias:", error)
       setError((error as Error).message || "Failed to get deployment alias")
+      setIsBooting(false)
     } finally {
       setIsLoading(false)
     }
-  }
-
-  // Poll for boot completion
-  const startBootPolling = () => {
-    const pollBoot = async () => {
-      try {
-        const response = await fetch("/api/deployment/alias", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            project_id: projectId,
-            alias_type: "dev",
-          }),
-          credentials: "include",
-        })
-
-        if (response.status !== 503) {
-          // Boot completed, stop polling and handle response
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current)
-            pollingIntervalRef.current = null
-          }
-
-          if (response.ok) {
-            const data = await response.json()
-            if (data.alias) {
-              setDeploymentAlias(data.alias)
-              setIsBooting(false)
-            } else {
-              throw new Error("No alias returned from deployment service")
-            }
-          } else {
-            // Error response
-            const errorData = await response.json()
-            throw new Error(errorData.error || "Failed to get deployment alias")
-          }
-        } else {
-          // Still booting, check if we've exceed 5 minutes
-          if (bootStartTime && Date.now() - bootStartTime > 300000) {
-            //5 minutes exceeded, stop polling and show error
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current)
-              pollingIntervalRef.current = null
-            }
-            setError("Project boot timeout. Please try again.")
-            setIsBooting(false)
-          }
-        }
-      } catch (error) {
-        console.error("Error polling boot status:", error)
-        setError((error as Error).message || "Failed to get deployment alias")
-        setIsBooting(false)
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current)
-          pollingIntervalRef.current = null
-        }
-      }
-    }
-
-    // Poll immediately, then every 10 seconds
-    pollBoot()
-    pollingIntervalRef.current = setInterval(pollBoot, 10000)
   }
 
   // Check if content has been generated
@@ -216,13 +141,6 @@ export default function WebsitePreview({
     setIframeLoaded(false)
     setSelectedElements([])
     setIsBooting(false)
-    setBootStartTime(null)
-
-    // Clear any polling intervals
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
-      pollingIntervalRef.current = null
-    }
 
     // Clear any selection overlays in the current iframe before changing
     if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -252,22 +170,8 @@ export default function WebsitePreview({
         // Remove src to stop any ongoing requests
         iframeRef.current.src = "about:blank"
       }
-      // Clear polling intervals
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = null
-      }
     }
   }, [projectId, isGenerating]) // Use projectId instead of projectName
-
-  // Cleanup intervals on unmount
-  useEffect(() => {
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-      }
-    }
-  }, [])
 
   // Handle iframe content for placeholder
   useEffect(() => {
@@ -664,11 +568,6 @@ export default function WebsitePreview({
   const handleRetryBoot = () => {
     setError(null)
     setIsBooting(false)
-    setBootStartTime(null)
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
-      pollingIntervalRef.current = null
-    }
     getDeploymentAlias()
   }
 
