@@ -48,13 +48,35 @@ export default function WebsitePreview({
   // Add state for booting modal
   const [isBooting, setIsBooting] = useState(false)
 
+  // Add refs to prevent duplicate requests
+  const requestInProgressRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const hasInitializedRef = useRef(false)
+
   // Update the getDeploymentAlias function to use projectId and handle 503
   const getDeploymentAlias = async (useColdStart = false) => {
     if (!projectId || isGenerating) return // Use projectId instead of projectName
 
+    // Prevent duplicate requests
+    if (requestInProgressRef.current) {
+      console.log("Request already in progress, skipping...")
+      return
+    }
+
     try {
+      requestInProgressRef.current = true
       setIsLoading(true)
       setError(null)
+
+      // Cancel any previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+
+      // Create new abort controller
+      abortControllerRef.current = new AbortController()
+
+      console.log(`Making deployment alias request: ${useColdStart ? "cold_start" : "dev"}`)
 
       // Call the new deployment/alias API with projectId
       const response = await fetch("/api/deployment/alias", {
@@ -67,15 +89,17 @@ export default function WebsitePreview({
           alias_type: useColdStart ? "cold_start" : "dev",
         }),
         credentials: "include", // Include cookies in the request
+        signal: abortControllerRef.current.signal,
       })
 
       // Handle 503 - Project is booting up
       if (response.status === 503 && !useColdStart) {
         // First 503 - show booting modal and make cold start request
+        console.log("Received 503, showing booting modal and making cold start request")
         setIsBooting(true)
         setIsLoading(false)
+        requestInProgressRef.current = false
 
-        console.log("Project is booting up, sending cold start request...")
         // Make cold start request and wait for response
         await getDeploymentAlias(true)
         return
@@ -98,17 +122,25 @@ export default function WebsitePreview({
       const data = (await response.json()) as DeploymentAlias
 
       if (data.alias) {
+        console.log("Successfully received deployment alias:", data.alias)
         setDeploymentAlias(data.alias)
         setIsBooting(false)
       } else {
         throw new Error("No alias returned from deployment service")
       }
     } catch (error) {
+      // Don't show error if request was aborted
+      if (error instanceof Error && error.name === "AbortError") {
+        console.log("Request was aborted")
+        return
+      }
+
       console.error("Error getting deployment alias:", error)
       setError((error as Error).message || "Failed to get deployment alias")
       setIsBooting(false)
     } finally {
       setIsLoading(false)
+      requestInProgressRef.current = false
     }
   }
 
@@ -119,28 +151,37 @@ export default function WebsitePreview({
     }
   }, [content])
 
-  // Notify parent when this tab is activated
+  // Single effect to handle tab activation and initial load
   useEffect(() => {
-    // This effect runs when the component mounts, which means the tab is active
+    // Notify parent when this tab is activated
     if (onTabActivated) {
       onTabActivated()
     }
 
-    // Get deployment alias if needed, but ONLY if not generating
-    if (projectId && !isGenerating && !deploymentAlias && !isLoading) {
-      // Use projectId instead of projectName
+    // Only make request if we haven't initialized for this project yet
+    if (projectId && !isGenerating && !deploymentAlias && !isLoading && !hasInitializedRef.current) {
+      console.log("Initializing deployment alias request for project:", projectId)
+      hasInitializedRef.current = true
       getDeploymentAlias()
     }
-  }, [])
+  }, []) // Empty dependency array - only run on mount
 
-  // Update the useEffect to use projectId
+  // Separate effect to handle project changes
   useEffect(() => {
     // Reset state when projectId changes
+    console.log("Project changed to:", projectId)
     setDeploymentAlias(null)
     setError(null)
     setIframeLoaded(false)
     setSelectedElements([])
     setIsBooting(false)
+    hasInitializedRef.current = false
+
+    // Cancel any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    requestInProgressRef.current = false
 
     // Clear any selection overlays in the current iframe before changing
     if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -159,7 +200,8 @@ export default function WebsitePreview({
 
     // Get deployment alias for this projectId, but ONLY if not generating
     if (projectId && !isGenerating) {
-      // Use projectId instead of projectName
+      console.log("Making deployment alias request for new project:", projectId)
+      hasInitializedRef.current = true
       getDeploymentAlias()
     }
 
@@ -170,8 +212,12 @@ export default function WebsitePreview({
         // Remove src to stop any ongoing requests
         iframeRef.current.src = "about:blank"
       }
+      // Cancel any ongoing requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
     }
-  }, [projectId, isGenerating]) // Use projectId instead of projectName
+  }, [projectId, isGenerating]) // Only depend on projectId and isGenerating
 
   // Handle iframe content for placeholder
   useEffect(() => {
@@ -568,6 +614,7 @@ export default function WebsitePreview({
   const handleRetryBoot = () => {
     setError(null)
     setIsBooting(false)
+    hasInitializedRef.current = false
     getDeploymentAlias()
   }
 
