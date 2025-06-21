@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react"
 import { Loader2, ExternalLink } from "lucide-react"
 // Add imports for the selection mode button
 import { Pointer, X } from "lucide-react"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 interface WebsitePreviewProps {
   content: string
@@ -43,9 +45,13 @@ export default function WebsitePreview({
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([])
   const [iframeLoaded, setIframeLoaded] = useState(false)
+  // Add state for booting modal
+  const [isBooting, setIsBooting] = useState(false)
+  const [bootStartTime, setBootStartTime] = useState<number | null>(null)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Update the getDeploymentAlias function to use projectId
-  const getDeploymentAlias = async () => {
+  // Update the getDeploymentAlias function to use projectId and handle 503
+  const getDeploymentAlias = async (forceStart = false) => {
     if (!projectId || isGenerating) return // Use projectId instead of projectName
 
     try {
@@ -61,9 +67,31 @@ export default function WebsitePreview({
         body: JSON.stringify({
           project_id: projectId,
           alias_type: "dev",
+          ...(forceStart && { force_start: true }),
         }),
         credentials: "include", // Include cookies in the request
       })
+
+      // Handle 503 - Project is booting up
+      if (response.status === 503) {
+        if (!forceStart) {
+          // First 503 - show booting modal and make force start request
+          setIsBooting(true)
+          setBootStartTime(Date.now())
+          setIsLoading(false)
+
+          // Make force start request
+          console.log("Project is booting up, sending force start request...")
+          await getDeploymentAlias(true)
+          return
+        } else {
+          // Force start request also returned 503, start polling
+          console.log("Force start initiated, starting boot polling...")
+          setIsLoading(false)
+          startBootPolling()
+          return
+        }
+      }
 
       // Check if the response is JSON before trying to parse it
       const contentType = response.headers.get("content-type")
@@ -83,6 +111,7 @@ export default function WebsitePreview({
 
       if (data.alias) {
         setDeploymentAlias(data.alias)
+        setIsBooting(false)
       } else {
         throw new Error("No alias returned from deployment service")
       }
@@ -92,6 +121,70 @@ export default function WebsitePreview({
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Poll for boot completion
+  const startBootPolling = () => {
+    const pollBoot = async () => {
+      try {
+        const response = await fetch("/api/deployment/alias", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            project_id: projectId,
+            alias_type: "dev",
+          }),
+          credentials: "include",
+        })
+
+        if (response.status !== 503) {
+          // Boot completed, stop polling and handle response
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current)
+            pollingIntervalRef.current = null
+          }
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.alias) {
+              setDeploymentAlias(data.alias)
+              setIsBooting(false)
+            } else {
+              throw new Error("No alias returned from deployment service")
+            }
+          } else {
+            // Error response
+            const errorData = await response.json()
+            throw new Error(errorData.error || "Failed to get deployment alias")
+          }
+        } else {
+          // Still booting, check if we've exceed 5 minutes
+          if (bootStartTime && Date.now() - bootStartTime > 300000) {
+            //5 minutes exceeded, stop polling and show error
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current)
+              pollingIntervalRef.current = null
+            }
+            setError("Project boot timeout. Please try again.")
+            setIsBooting(false)
+          }
+        }
+      } catch (error) {
+        console.error("Error polling boot status:", error)
+        setError((error as Error).message || "Failed to get deployment alias")
+        setIsBooting(false)
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current)
+          pollingIntervalRef.current = null
+        }
+      }
+    }
+
+    // Poll immediately, then every 10 seconds
+    pollBoot()
+    pollingIntervalRef.current = setInterval(pollBoot, 10000)
   }
 
   // Check if content has been generated
@@ -122,6 +215,14 @@ export default function WebsitePreview({
     setError(null)
     setIframeLoaded(false)
     setSelectedElements([])
+    setIsBooting(false)
+    setBootStartTime(null)
+
+    // Clear any polling intervals
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
 
     // Clear any selection overlays in the current iframe before changing
     if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -151,8 +252,22 @@ export default function WebsitePreview({
         // Remove src to stop any ongoing requests
         iframeRef.current.src = "about:blank"
       }
+      // Clear polling intervals
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
     }
   }, [projectId, isGenerating]) // Use projectId instead of projectName
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
+    }
+  }, [])
 
   // Handle iframe content for placeholder
   useEffect(() => {
@@ -545,104 +660,165 @@ export default function WebsitePreview({
     setError("Failed to load preview. Please try refreshing.")
   }
 
+  // Handle retry for booting
+  const handleRetryBoot = () => {
+    setError(null)
+    setIsBooting(false)
+    setBootStartTime(null)
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+    getDeploymentAlias()
+  }
+
   // Add a flex-grow and min-width to ensure the preview maintains its size
   return (
-    <div className="flex-1 flex-grow bg-background flex flex-col h-full min-w-0">
-      <div className="flex items-center p-2 border-b border-border bg-[#13111C]">
-        <div className="flex-1 mx-auto max-w-md flex items-center">
-          <div className="bg-background border border-input rounded-md px-3 py-1 text-sm text-center truncate flex-1">
-            {deploymentAlias
-              ? deploymentAlias.startsWith("http")
-                ? deploymentAlias
-                : `https://${deploymentAlias}`
-              : "preview.manufactura.ai"}
+    <>
+      <div className="flex-1 flex-grow bg-background flex flex-col h-full min-w-0">
+        <div className="flex items-center p-2 border-b border-border bg-[#13111C]">
+          <div className="flex-1 mx-auto max-w-md flex items-center">
+            <div className="bg-background border border-input rounded-md px-3 py-1 text-sm text-center truncate flex-1">
+              {deploymentAlias
+                ? deploymentAlias.startsWith("http")
+                  ? deploymentAlias
+                  : `https://${deploymentAlias}`
+                : "preview.manufactura.ai"}
+            </div>
+            <button
+              onClick={openPreview}
+              className="ml-2 p-1.5 rounded-md bg-background border border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              title="Open preview in new tab"
+              disabled={!deploymentAlias || isGenerating}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </button>
+            <button
+              onClick={toggleSelectionMode}
+              className={`ml-2 p-1.5 rounded-md ${
+                isSelectionMode
+                  ? "bg-purple-600 text-white"
+                  : "bg-background border border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              }`}
+              title={isSelectionMode ? "Disable selection mode" : "Enable selection mode"}
+              disabled={!deploymentAlias || isGenerating || !iframeLoaded}
+            >
+              <Pointer className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            onClick={openPreview}
-            className="ml-2 p-1.5 rounded-md bg-background border border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            title="Open preview in new tab"
-            disabled={!deploymentAlias || isGenerating}
-          >
-            <ExternalLink className="h-4 w-4" />
-          </button>
-          <button
-            onClick={toggleSelectionMode}
-            className={`ml-2 p-1.5 rounded-md ${
-              isSelectionMode
-                ? "bg-purple-600 text-white"
-                : "bg-background border border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-            title={isSelectionMode ? "Disable selection mode" : "Enable selection mode"}
-            disabled={!deploymentAlias || isGenerating || !iframeLoaded}
-          >
-            <Pointer className="h-4 w-4" />
-          </button>
+        </div>
+
+        {selectedElements.length > 0 && (
+          <div className="bg-[#13111C] border-b border-border px-4 py-1.5 flex items-center">
+            <span className="text-sm text-purple-300 font-medium">
+              {selectedElements.length} element{selectedElements.length !== 1 ? "s" : ""} selected
+            </span>
+            <button
+              onClick={clearSelectedElements}
+              className="ml-2 text-xs text-purple-400 hover:text-purple-300 flex items-center"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Remove
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-hidden relative">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#0A090F]/80 z-10">
+              <div className="flex flex-col items-center">
+                <Loader2 className="h-8 w-8 text-purple-400 animate-spin mb-2" />
+                <p className="text-purple-200">Preparing deployment...</p>
+              </div>
+            </div>
+          )}
+
+          {error && !isBooting && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#0A090F]/80 z-10">
+              <div className="bg-[#13111C] p-6 rounded-lg border border-red-500/30 max-w-md">
+                <h3 className="text-red-400 font-medium mb-2">Error Preparing Deployment</h3>
+                <p className="text-gray-300 text-sm">{error}</p>
+                <button
+                  onClick={handleRetryBoot}
+                  className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-md text-sm"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+
+          {deploymentAlias ? (
+            <iframe
+              key={`preview-${projectId}`} // Use projectId instead of projectName
+              ref={iframeRef}
+              src={deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`}
+              title="Website Preview"
+              className="w-full h-full border-none"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-top-navigation-by-user-activation"
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
+            />
+          ) : (
+            <iframe
+              key={`placeholder-${projectId}`} // Use projectId instead of projectName
+              ref={iframeRef}
+              title="Website Preview"
+              className="w-full h-full border-none"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-top-navigation-by-user-activation"
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
+            />
+          )}
         </div>
       </div>
 
-      {selectedElements.length > 0 && (
-        <div className="bg-[#13111C] border-b border-border px-4 py-1.5 flex items-center">
-          <span className="text-sm text-purple-300 font-medium">
-            {selectedElements.length} element{selectedElements.length !== 1 ? "s" : ""} selected
-          </span>
-          <button
-            onClick={clearSelectedElements}
-            className="ml-2 text-xs text-purple-400 hover:text-purple-300 flex items-center"
-          >
-            <X className="h-3 w-3 mr-1" />
-            Remove
-          </button>
-        </div>
-      )}
-
-      <div className="flex-1 overflow-hidden relative">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0A090F]/80 z-10">
-            <div className="flex flex-col items-center">
-              <Loader2 className="h-8 w-8 text-purple-400 animate-spin mb-2" />
-              <p className="text-purple-200">Preparing deployment...</p>
+      {/* Booting Modal */}
+      <Dialog open={isBooting} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md bg-[#0A090F] border-gray-800 p-0 overflow-hidden rounded-xl">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-medium text-white">Project Starting Up</h2>
             </div>
-          </div>
-        )}
 
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0A090F]/80 z-10">
-            <div className="bg-[#13111C] p-6 rounded-lg border border-red-500/30 max-w-md">
-              <h3 className="text-red-400 font-medium mb-2">Error Preparing Deployment</h3>
-              <p className="text-gray-300 text-sm">{error}</p>
-              <button
-                onClick={getDeploymentAlias}
-                className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-md text-sm"
-              >
-                Retry
-              </button>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-sm text-white font-medium">Initializing</span>
+              <span className="text-sm text-gray-400 ml-1">{projectName}</span>
             </div>
-          </div>
-        )}
 
-        {deploymentAlias ? (
-          <iframe
-            key={`preview-${projectId}`} // Use projectId instead of projectName
-            ref={iframeRef}
-            src={deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`}
-            title="Website Preview"
-            className="w-full h-full border-none"
-            sandbox="allow-same-origin allow-scripts allow-popups allow-top-navigation-by-user-activation"
-            onLoad={handleIframeLoad}
-            onError={handleIframeError}
-          />
-        ) : (
-          <iframe
-            key={`placeholder-${projectId}`} // Use projectId instead of projectName
-            ref={iframeRef}
-            title="Website Preview"
-            className="w-full h-full border-none"
-            sandbox="allow-same-origin allow-scripts allow-popups allow-top-navigation-by-user-activation"
-            onLoad={handleIframeLoad}
-            onError={handleIframeError}
-          />
-        )}
-      </div>
-    </div>
+            <div className="mb-4">
+              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
+                <p className="text-sm text-blue-200">
+                  Your project is starting up. This may take 1-3 minutes as we initialize the preview environment.
+                </p>
+              </div>
+            </div>
+
+            <Button
+              className="w-full bg-[#13111C] hover:bg-[#1A1825] text-white border border-gray-800 h-9 text-sm"
+              disabled
+            >
+              <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+              Starting Project
+            </Button>
+
+            {error && (
+              <div className="mt-4">
+                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 mb-3">
+                  <p className="text-sm text-gray-300">{error}</p>
+                </div>
+                <Button
+                  onClick={handleRetryBoot}
+                  className="w-full bg-purple-600 hover:bg-purple-500 text-white h-9 text-sm"
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
