@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { X, Globe, Copy, Check, AlertCircle, Loader2, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -24,6 +24,17 @@ interface DomainSetupResponse {
   status: string
 }
 
+interface DeploymentResponse {
+  status: "success"
+  deployment: {
+    deployment_url: string
+    created_at: number
+    updated_at: number
+    domain: string | null
+    domain_status: "DNS_PENDING" | "DNS_VERIFIED" | "PROVISIONED" | "PROVISION_ERROR" | "DELETING" | null
+  }
+}
+
 export default function DomainSettingsModal({ isOpen, onClose, projectId, projectName }: DomainSettingsModalProps) {
   const [domain, setDomain] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -34,6 +45,28 @@ export default function DomainSettingsModal({ isOpen, onClose, projectId, projec
   const [setupComplete, setSetupComplete] = useState(false)
   const [copiedRecord, setCopiedRecord] = useState<string | null>(null)
   const [currentDomain, setCurrentDomain] = useState<string>("")
+  const [isSuccess, setIsSuccess] = useState(false)
+  const [domainStatus, setDomainStatus] = useState<string | null>(null)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Cleanup polling when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
+  }, [isOpen])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
+    }
+  }, [])
 
   const handleDomainSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,15 +106,58 @@ export default function DomainSettingsModal({ isOpen, onClose, projectId, projec
     }
   }
 
+  const startDomainStatusPolling = () => {
+    const pollDomainStatus = async () => {
+      try {
+        const response = await fetch(`/api/deployment?project_id=${projectId}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data: DeploymentResponse = await response.json()
+          if (data.status === "success" && data.deployment) {
+            const newStatus = data.deployment.domain_status
+            setDomainStatus(newStatus)
+
+            if (newStatus === "PROVISIONED") {
+              // Success! Stop polling and show success state
+              if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current)
+                pollingIntervalRef.current = null
+              }
+              setIsProvisioning(false)
+              setIsSuccess(true)
+            } else if (newStatus === "PROVISION_ERROR") {
+              // Error occurred, stop polling and show error
+              if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current)
+                pollingIntervalRef.current = null
+              }
+              setIsProvisioning(false)
+              setError("Domain provisioning failed. Please check your DNS settings and try again.")
+            }
+            // For other statuses (DNS_PENDING, DNS_VERIFIED), continue polling
+          }
+        }
+      } catch (error) {
+        console.error("Error polling domain status:", error)
+        // Continue polling on error, but log it
+      }
+    }
+
+    // Poll immediately, then every 15 seconds
+    pollDomainStatus()
+    pollingIntervalRef.current = setInterval(pollDomainStatus, 15000)
+  }
+
   const handleVerifyDomain = async () => {
     if (!currentDomain) return
 
     setIsVerifying(true)
     setError(null)
-
-    // Immediately switch to provisioning state
-    setIsProvisioning(true)
-    setIsVerifying(false)
 
     try {
       const response = await fetch("/api/deployment/domain/provision", {
@@ -99,18 +175,29 @@ export default function DomainSettingsModal({ isOpen, onClose, projectId, projec
         const errorData = await response.json()
         if (response.status === 400) {
           // Switch back to DNS records screen and show error
-          setIsProvisioning(false)
+          setIsVerifying(false)
           setError("DNS records not verified. Please ensure all nameservers are properly configured and try again.")
           return
         }
         throw new Error(errorData.error || "Failed to provision domain")
       }
 
-      // Provisioning started successfully - keep showing provisioning state
-      // Note: In a real implementation, you might want to poll for provisioning status
+      const data = await response.json()
+
+      // Check if the response indicates scheduling was successful
+      if (data.status === "scheduled") {
+        // Success - start polling for domain status
+        setIsVerifying(false)
+        setIsProvisioning(true)
+        startDomainStatusPolling()
+      } else {
+        // Unexpected response
+        setIsVerifying(false)
+        setError("Unexpected response from server. Please try again.")
+      }
     } catch (error) {
       console.error("Error provisioning domain:", error)
-      setIsProvisioning(false)
+      setIsVerifying(false)
       setError((error as Error).message || "Failed to provision domain")
     }
   }
@@ -122,6 +209,12 @@ export default function DomainSettingsModal({ isOpen, onClose, projectId, projec
   }
 
   const handleReset = () => {
+    // Clear polling when resetting
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+
     setDomain("")
     setCurrentDomain("")
     setNameservers([])
@@ -129,6 +222,23 @@ export default function DomainSettingsModal({ isOpen, onClose, projectId, projec
     setError(null)
     setIsProvisioning(false)
     setIsVerifying(false)
+    setIsSuccess(false)
+    setDomainStatus(null)
+  }
+
+  const getDomainStatusText = (status: string | null) => {
+    switch (status) {
+      case "DNS_PENDING":
+        return "DNS Pending"
+      case "DNS_VERIFIED":
+        return "DNS Verified"
+      case "PROVISIONED":
+        return "Provisioned"
+      case "PROVISION_ERROR":
+        return "Provision Error"
+      default:
+        return "Processing"
+    }
   }
 
   return (
@@ -197,6 +307,9 @@ export default function DomainSettingsModal({ isOpen, onClose, projectId, projec
                 <div>
                   <h3 className="text-sm text-white font-medium">Provisioning Domain</h3>
                   <p className="text-sm text-gray-400">{currentDomain}</p>
+                  {domainStatus && (
+                    <p className="text-xs text-gray-500 mt-1">Status: {getDomainStatusText(domainStatus)}</p>
+                  )}
                 </div>
               </div>
 
@@ -213,6 +326,42 @@ export default function DomainSettingsModal({ isOpen, onClose, projectId, projec
               >
                 Configure Another Domain
               </Button>
+            </div>
+          ) : isSuccess ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-9 w-9 rounded-full bg-green-900 flex items-center justify-center">
+                  <Check className="h-4 w-4 text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm text-white font-medium">Domain Successfully Configured</h3>
+                  <p className="text-sm text-gray-400">{currentDomain}</p>
+                </div>
+              </div>
+
+              <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
+                <p className="text-sm text-green-200">
+                  Your custom domain has been successfully configured and is now live! You can access your project at{" "}
+                  {currentDomain}.
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => window.open(`https://${currentDomain}`, "_blank")}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white h-9 text-sm"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 mr-2" />
+                  Visit Domain
+                </Button>
+                <Button
+                  onClick={handleReset}
+                  variant="outline"
+                  className="border-gray-800 text-gray-300 hover:text-white h-9 px-3"
+                >
+                  Configure Another
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
