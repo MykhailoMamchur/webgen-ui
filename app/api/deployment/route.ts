@@ -1,36 +1,36 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { API_BASE_URL } from "@/lib/config"
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    // Parse the request body
-    const body = await request.json()
-    const { project_id } = body
+    // Get project_id from query parameters
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get("project_id")
 
     // Get the access token from the request cookies
     const accessToken = request.cookies.get("access_token")?.value
 
     // Validate the project ID
-    if (!project_id) {
+    if (!projectId) {
       return NextResponse.json({ error: "Project ID is required" }, { status: 400 })
     }
 
     // Forward the request to the external API using the environment-specific base URL
-    const response = await fetch(`${API_BASE_URL}/deployment`, {
-      method: "POST",
+    const response = await fetch(`${API_BASE_URL}/deployment?project_id=${projectId}`, {
+      method: "GET",
       headers: {
         "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), // Ensure proper format with space
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
-      body: JSON.stringify({
-        project_id,
-        branch: body.branch || "main",
-        target: body.target || "production",
-      }),
     })
 
     // Check if the response is successful
     if (!response.ok) {
+      if (response.status === 404) {
+        // No deployment found - this is expected for new projects
+        return NextResponse.json({ error: "No deployment found" }, { status: 404 })
+      }
+
       const errorText = await response.text()
       console.error(`External API error (${response.status}):`, errorText)
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in deployment API:", error)
+    console.error("Error in deployment GET API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

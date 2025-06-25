@@ -5,6 +5,7 @@ import { X, Check, ExternalLink, Loader2, Globe, Copy, ChevronRight } from "luci
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 import DomainSettingsModal from "./domain-settings-modal"
 
 interface DeploymentModalProps {
@@ -14,9 +15,12 @@ interface DeploymentModalProps {
   projectName: string
 }
 
-interface DeploymentAlias {
-  project_name: string
-  alias: string
+interface ExistingDeployment {
+  deployment_url: string
+  created_at: number
+  updated_at: number
+  domain: string
+  domain_status: "DNS_PENDING" | "DNS_VERIFIED" | "PROVISIONED" | "PROVISION_ERROR"
 }
 
 interface DeploymentStatus {
@@ -26,6 +30,7 @@ interface DeploymentStatus {
 
 export default function DeploymentModal({ isOpen, onClose, projectId, projectName }: DeploymentModalProps) {
   const [deploymentStatus, setDeploymentStatus] = useState<"idle" | "loading" | "polling" | "success" | "error">("idle")
+  const [existingDeployment, setExistingDeployment] = useState<ExistingDeployment | null>(null)
   const [deploymentAlias, setDeploymentAlias] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<boolean>(false)
@@ -37,7 +42,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   useEffect(() => {
     if (isOpen && projectId && initialLoadRef.current) {
       initialLoadRef.current = false
-      getDeploymentAlias()
+      checkExistingDeployment()
     }
 
     // Reset the ref when modal closes
@@ -61,6 +66,44 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   }, [])
 
   // Check if deployment already exists
+  const checkExistingDeployment = async () => {
+    try {
+      setDeploymentStatus("loading")
+      setError(null)
+
+      // First, check if there's an existing deployment
+      const response = await fetch(`/api/deployment?project_id=${projectId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.ok) {
+        // Existing deployment found
+        const data = await response.json()
+        if (data.status === "success" && data.deployment) {
+          setExistingDeployment(data.deployment)
+          setDeploymentAlias(data.deployment.deployment_url)
+          setDeploymentStatus("success")
+          return
+        }
+      } else if (response.status === 404) {
+        // No existing deployment, proceed with alias check and creation
+        return getDeploymentAlias()
+      } else {
+        // Other error, try to proceed with creation anyway
+        console.error("Error checking existing deployment:", await response.text())
+        return getDeploymentAlias()
+      }
+    } catch (error) {
+      console.error("Error checking existing deployment:", error)
+      // If any error occurs, try to proceed with creation
+      return getDeploymentAlias()
+    }
+  }
+
+  // Check if deployment already exists (legacy flow)
   const getDeploymentAlias = async () => {
     try {
       setDeploymentStatus("loading")
@@ -230,17 +273,19 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   }
 
   const handleOpenDeployment = () => {
-    if (deploymentAlias) {
+    const url = existingDeployment?.deployment_url || deploymentAlias
+    if (url) {
       // Ensure the URL has https:// prefix
-      const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
-      window.open(url, "_blank")
+      const finalUrl = url.startsWith("http") ? url : `https://${url}`
+      window.open(finalUrl, "_blank")
     }
   }
 
   const handleCopyUrl = () => {
-    if (deploymentAlias) {
-      const url = deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`
-      navigator.clipboard.writeText(url)
+    const url = existingDeployment?.deployment_url || deploymentAlias
+    if (url) {
+      const finalUrl = url.startsWith("http") ? url : `https://${url}`
+      navigator.clipboard.writeText(finalUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
@@ -249,6 +294,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   const handleRedeploy = () => {
     // Reset state and trigger a new deployment
     setDeploymentStatus("loading")
+    setExistingDeployment(null)
     setDeploymentAlias(null)
     setError(null)
     createDeployment()
@@ -257,6 +303,53 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   const handleDomainSettings = () => {
     setIsDomainModalOpen(true)
   }
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const getDomainStatusBadge = (status: string) => {
+    switch (status) {
+      case "PROVISIONED":
+        return (
+          <Badge variant="default" className="bg-green-900/30 text-green-400 border-green-500/30">
+            Active
+          </Badge>
+        )
+      case "DNS_VERIFIED":
+        return (
+          <Badge variant="default" className="bg-blue-900/30 text-blue-400 border-blue-500/30">
+            Verified
+          </Badge>
+        )
+      case "DNS_PENDING":
+        return (
+          <Badge variant="default" className="bg-yellow-900/30 text-yellow-400 border-yellow-500/30">
+            Pending
+          </Badge>
+        )
+      case "PROVISION_ERROR":
+        return (
+          <Badge variant="destructive" className="bg-red-900/30 text-red-400 border-red-500/30">
+            Error
+          </Badge>
+        )
+      default:
+        return (
+          <Badge variant="secondary" className="bg-gray-900/30 text-gray-400 border-gray-500/30">
+            Unknown
+          </Badge>
+        )
+    }
+  }
+
+  const displayUrl = existingDeployment?.deployment_url || deploymentAlias
 
   return (
     <>
@@ -342,7 +435,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                 Retry Publication
               </Button>
             </div>
-          ) : deploymentStatus === "success" && deploymentAlias ? (
+          ) : deploymentStatus === "success" && displayUrl ? (
             <div className="p-5">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-base font-medium text-white">Publication Complete</h2>
@@ -365,6 +458,31 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                   <p className="text-sm text-gray-400">{projectName}</p>
                 </div>
               </div>
+
+              {/* Show deployment info if we have existing deployment data */}
+              {existingDeployment && (
+                <div className="mb-5">
+                  <div className="bg-[#13111C] border border-gray-800 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400">Created</span>
+                      <span className="text-xs text-gray-300">{formatDate(existingDeployment.created_at)}</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400">Last Updated</span>
+                      <span className="text-xs text-gray-300">{formatDate(existingDeployment.updated_at)}</span>
+                    </div>
+                    {existingDeployment.domain && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">Custom Domain</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-300">{existingDeployment.domain}</span>
+                          {getDomainStatusBadge(existingDeployment.domain_status)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="mb-5">
                 <div className="flex items-center justify-between mb-2">
@@ -391,7 +509,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                   </div>
                 </div>
                 <div className="bg-[#13111C] border border-gray-800 rounded-lg p-2.5 font-mono text-sm text-purple-300 break-all">
-                  {deploymentAlias.startsWith("http") ? deploymentAlias : `https://${deploymentAlias}`}
+                  {displayUrl.startsWith("http") ? displayUrl : `https://${displayUrl}`}
                 </div>
               </div>
 
