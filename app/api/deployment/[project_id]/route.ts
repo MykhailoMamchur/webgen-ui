@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: { project_
     }
 
     // Forward the request to the external API using the environment-specific base URL
-    const response = await fetch(`${API_BASE_URL}/deployment?project_id=${projectId}`, {
+    const response = await fetch(`${API_BASE_URL}/deployment/${projectId}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
