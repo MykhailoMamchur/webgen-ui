@@ -459,7 +459,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
       case "DNS_VERIFIED":
         return (
           <Badge variant="default" className="bg-blue-900/30 text-blue-400 border-blue-500/30 text-xs">
-            Verified
+            Connecting
           </Badge>
         )
       case "DNS_PENDING":
