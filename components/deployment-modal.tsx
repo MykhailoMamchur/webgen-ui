@@ -53,6 +53,10 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   // Add tier data state
   const [tierData, setTierData] = useState<TierData | null>(null)
 
+  // Add state to track deployment creation and prevent duplicate requests:
+  const [deploymentCreationInProgress, setDeploymentCreationInProgress] = useState<boolean>(false)
+  const deploymentCreationRef = useRef<string | null>(null) // Track which project has deployment in progress
+
   // Add function to fetch user tier data
   const fetchUserTierData = async () => {
     try {
@@ -138,6 +142,9 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
       }
+      // Clear deployment creation tracking on unmount
+      setDeploymentCreationInProgress(false)
+      deploymentCreationRef.current = null
     }
   }, [])
 
@@ -146,6 +153,14 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     try {
       setDeploymentStatus("loading")
       setError(null)
+
+      // Check if we're already creating a deployment for this project
+      if (deploymentCreationInProgress && deploymentCreationRef.current === projectId) {
+        console.log("Deployment creation already in progress for this project, resuming polling...")
+        setDeploymentStatus("polling")
+        startPollingDeploymentStatus()
+        return
+      }
 
       // First, check if there's an existing deployment
       const response = await fetch(`/api/deployment/${projectId}`, {
@@ -162,10 +177,13 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
           setExistingDeployment(data.deployment)
           setDeploymentAlias(data.deployment.deployment_url)
           setDeploymentStatus("success")
+          // Clear any in-progress tracking since we found a completed deployment
+          setDeploymentCreationInProgress(false)
+          deploymentCreationRef.current = null
           return
         }
       } else if (response.status === 404) {
-        // No existing deployment found - create a new one
+        // No existing deployment found - create a new one only if not already in progress
         console.log("No existing deployment found, creating new deployment...")
         return createDeployment()
       } else {
@@ -183,8 +201,18 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   // Create a new deployment
   const createDeployment = async () => {
     try {
+      // Prevent duplicate deployment creation requests
+      if (deploymentCreationInProgress && deploymentCreationRef.current === projectId) {
+        console.log("Deployment creation already in progress for this project, skipping...")
+        setDeploymentStatus("polling")
+        startPollingDeploymentStatus()
+        return
+      }
+
       setError(null)
       setDeploymentStatus("loading")
+      setDeploymentCreationInProgress(true)
+      deploymentCreationRef.current = projectId
 
       console.log("Creating new deployment for project:", projectId)
 
@@ -227,6 +255,9 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
       console.error("Error creating deployment:", error)
       setError((error as Error).message || "Failed to create deployment")
       setDeploymentStatus("error")
+      // Clear in-progress tracking on error
+      setDeploymentCreationInProgress(false)
+      deploymentCreationRef.current = null
     }
   }
 
@@ -296,6 +327,9 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
           setExistingDeployment(data.deployment)
           setDeploymentAlias(data.deployment.deployment_url)
           setDeploymentStatus("success")
+          // Clear in-progress tracking since deployment is complete
+          setDeploymentCreationInProgress(false)
+          deploymentCreationRef.current = null
           return
         }
       }
@@ -305,6 +339,9 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
       console.error("Error fetching completed deployment:", error)
       setError((error as Error).message || "Failed to fetch deployment data")
       setDeploymentStatus("error")
+      // Clear in-progress tracking on error
+      setDeploymentCreationInProgress(false)
+      deploymentCreationRef.current = null
     }
   }
 
@@ -339,6 +376,9 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     setExistingDeployment(null)
     setDeploymentAlias(null)
     setError(null)
+    // Clear any previous deployment creation tracking
+    setDeploymentCreationInProgress(false)
+    deploymentCreationRef.current = null
     createDeployment()
   }
 
