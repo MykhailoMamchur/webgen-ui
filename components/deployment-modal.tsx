@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { X, Check, ExternalLink, Loader2, Globe, Copy, ChevronRight } from "lucide-react"
+import { X, Check, ExternalLink, Loader2, Globe, Copy, ChevronRight, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import DomainSettingsModal from "./domain-settings-modal"
 
@@ -36,6 +37,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   const [copied, setCopied] = useState<boolean>(false)
   const [isDomainModalOpen, setIsDomainModalOpen] = useState(false)
   const [isDeletingDomain, setIsDeletingDomain] = useState(false)
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
   const initialLoadRef = useRef(true)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
@@ -275,7 +277,9 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   }
 
   const handleOpenDeployment = () => {
-    const url = existingDeployment?.deployment_url || deploymentAlias
+    const url = existingDeployment?.domain
+      ? `https://${existingDeployment.domain}`
+      : existingDeployment?.deployment_url || deploymentAlias
     if (url) {
       // Ensure the URL has https:// prefix
       const finalUrl = url.startsWith("http") ? url : `https://${url}`
@@ -284,7 +288,9 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   }
 
   const handleCopyUrl = () => {
-    const url = existingDeployment?.deployment_url || deploymentAlias
+    const url = existingDeployment?.domain
+      ? `https://${existingDeployment.domain}`
+      : existingDeployment?.deployment_url || deploymentAlias
     if (url) {
       const finalUrl = url.startsWith("http") ? url : `https://${url}`
       navigator.clipboard.writeText(finalUrl)
@@ -306,11 +312,16 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     setIsDomainModalOpen(true)
   }
 
-  const handleDeleteDomain = async () => {
+  const handleDeleteDomainClick = () => {
+    setShowDeleteConfirmation(true)
+  }
+
+  const handleConfirmDeleteDomain = async () => {
     if (!existingDeployment?.domain) return
 
     try {
       setIsDeletingDomain(true)
+      setShowDeleteConfirmation(false)
 
       const response = await fetch(`/api/deployment/domain?project_id=${projectId}`, {
         method: "DELETE",
@@ -361,41 +372,46 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     }
   }
 
-  const getDomainStatusText = (status: string | null) => {
-    if (!status) return ""
+  const getDomainStatusBadge = (status: string | null) => {
+    if (!status) return null
 
     switch (status) {
       case "PROVISIONED":
-        return "Active"
+        return (
+          <Badge variant="default" className="bg-green-900/30 text-green-400 border-green-500/30 text-xs">
+            Active
+          </Badge>
+        )
       case "DNS_VERIFIED":
-        return "Verified"
+        return (
+          <Badge variant="default" className="bg-blue-900/30 text-blue-400 border-blue-500/30 text-xs">
+            Verified
+          </Badge>
+        )
       case "DNS_PENDING":
-        return "Pending"
+        return (
+          <Badge variant="default" className="bg-yellow-900/30 text-yellow-400 border-yellow-500/30 text-xs">
+            Pending
+          </Badge>
+        )
       case "PROVISION_ERROR":
-        return "Error"
+        return (
+          <Badge variant="destructive" className="bg-red-900/30 text-red-400 border-red-500/30 text-xs">
+            Error
+          </Badge>
+        )
       default:
-        return "Unknown"
+        return (
+          <Badge variant="secondary" className="bg-gray-900/30 text-gray-400 border-gray-500/30 text-xs">
+            Unknown
+          </Badge>
+        )
     }
   }
 
-  const getDomainStatusColor = (status: string | null) => {
-    if (!status) return "text-gray-400"
-
-    switch (status) {
-      case "PROVISIONED":
-        return "text-green-400"
-      case "DNS_VERIFIED":
-        return "text-blue-400"
-      case "DNS_PENDING":
-        return "text-yellow-400"
-      case "PROVISION_ERROR":
-        return "text-red-400"
-      default:
-        return "text-gray-400"
-    }
-  }
-
-  const displayUrl = existingDeployment?.deployment_url || deploymentAlias
+  const displayUrl = existingDeployment?.domain
+    ? `https://${existingDeployment.domain}`
+    : existingDeployment?.deployment_url || deploymentAlias
 
   return (
     <>
@@ -545,9 +561,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                     {existingDeployment?.domain ? (
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-white">{existingDeployment.domain}</span>
-                        <span className={`text-xs ${getDomainStatusColor(existingDeployment.domain_status)}`}>
-                          {getDomainStatusText(existingDeployment.domain_status)}
-                        </span>
+                        {getDomainStatusBadge(existingDeployment.domain_status)}
                       </div>
                     ) : (
                       <span className="text-sm text-white">Set a custom domain</span>
@@ -557,7 +571,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={handleDeleteDomain}
+                      onClick={handleDeleteDomainClick}
                       disabled={isDeletingDomain}
                       className="text-gray-400 hover:text-red-400 h-7 w-7 p-0"
                       title="Remove domain"
@@ -590,6 +604,54 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
               </Button>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Domain Confirmation Dialog */}
+      <Dialog open={showDeleteConfirmation} onOpenChange={setShowDeleteConfirmation}>
+        <DialogContent className="sm:max-w-md bg-[#0A090F] border-gray-800">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-10 w-10 rounded-full bg-red-900/20 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-white text-base">Remove Custom Domain</DialogTitle>
+                <DialogDescription className="text-gray-400 text-sm">This action cannot be undone.</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-300">
+              Are you sure you want to remove{" "}
+              <span className="font-medium text-white">{existingDeployment?.domain}</span> from your deployment? Your
+              website will no longer be accessible from this custom domain.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="ghost"
+                onClick={() => setShowDeleteConfirmation(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmDeleteDomain}
+                disabled={isDeletingDomain}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeletingDomain ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Removing...
+                  </>
+                ) : (
+                  "Remove Domain"
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
