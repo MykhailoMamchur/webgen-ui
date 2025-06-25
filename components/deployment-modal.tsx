@@ -29,13 +29,23 @@ interface DeploymentStatus {
   [key: string]: any
 }
 
-// Add TierData interface if not already present
 interface TierData {
   user_id: string
   tier_type: string
   edits_left: number
   renewal_at: number
 }
+
+// Deployment creation tracking interface
+interface DeploymentCreationTracker {
+  projectId: string
+  timestamp: number
+  status: "creating" | "polling"
+}
+
+// Constants
+const DEPLOYMENT_CREATION_TIMEOUT = 15 * 60 * 1000 // 15 minutes
+const DEPLOYMENT_CREATION_KEY = "deployment_creation_tracker"
 
 export default function DeploymentModal({ isOpen, onClose, projectId, projectName }: DeploymentModalProps) {
   const [deploymentStatus, setDeploymentStatus] = useState<"idle" | "loading" | "polling" | "success" | "error">("idle")
@@ -53,9 +63,56 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   // Add tier data state
   const [tierData, setTierData] = useState<TierData | null>(null)
 
-  // Add state to track deployment creation and prevent duplicate requests:
-  const [deploymentCreationInProgress, setDeploymentCreationInProgress] = useState<boolean>(false)
-  const deploymentCreationRef = useRef<string | null>(null) // Track which project has deployment in progress
+  // Utility functions for deployment creation tracking
+  const getDeploymentCreationTracker = (): DeploymentCreationTracker | null => {
+    try {
+      const stored = localStorage.getItem(DEPLOYMENT_CREATION_KEY)
+      if (!stored) return null
+
+      const tracker: DeploymentCreationTracker = JSON.parse(stored)
+
+      // Check if the tracker is stale (older than timeout)
+      if (Date.now() - tracker.timestamp > DEPLOYMENT_CREATION_TIMEOUT) {
+        localStorage.removeItem(DEPLOYMENT_CREATION_KEY)
+        return null
+      }
+
+      return tracker
+    } catch (error) {
+      console.error("Error reading deployment creation tracker:", error)
+      localStorage.removeItem(DEPLOYMENT_CREATION_KEY)
+      return null
+    }
+  }
+
+  const setDeploymentCreationTracker = (projectId: string, status: "creating" | "polling") => {
+    try {
+      const tracker: DeploymentCreationTracker = {
+        projectId,
+        timestamp: Date.now(),
+        status,
+      }
+      localStorage.setItem(DEPLOYMENT_CREATION_KEY, JSON.stringify(tracker))
+    } catch (error) {
+      console.error("Error setting deployment creation tracker:", error)
+    }
+  }
+
+  const clearDeploymentCreationTracker = (projectId?: string) => {
+    try {
+      const tracker = getDeploymentCreationTracker()
+      if (!tracker || !projectId || tracker.projectId === projectId) {
+        localStorage.removeItem(DEPLOYMENT_CREATION_KEY)
+      }
+    } catch (error) {
+      console.error("Error clearing deployment creation tracker:", error)
+    }
+  }
+
+  const isDeploymentCreationInProgress = (projectId: string): boolean => {
+    const tracker = getDeploymentCreationTracker()
+    return tracker !== null && tracker.projectId === projectId
+  }
 
   // Add function to fetch user tier data
   const fetchUserTierData = async () => {
@@ -122,7 +179,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     if (isOpen && projectId && initialLoadRef.current) {
       initialLoadRef.current = false
       checkExistingDeployment()
-      fetchUserTierData() // Add this line
+      fetchUserTierData()
     }
 
     // Reset the ref when modal closes
@@ -142,9 +199,6 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
       }
-      // Clear deployment creation tracking on unmount
-      setDeploymentCreationInProgress(false)
-      deploymentCreationRef.current = null
     }
   }, [])
 
@@ -155,10 +209,23 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
       setError(null)
 
       // Check if we're already creating a deployment for this project
-      if (deploymentCreationInProgress && deploymentCreationRef.current === projectId) {
-        console.log("Deployment creation already in progress for this project, resuming polling...")
-        setDeploymentStatus("polling")
-        startPollingDeploymentStatus()
+      if (isDeploymentCreationInProgress(projectId)) {
+        const tracker = getDeploymentCreationTracker()
+        console.log("Deployment creation already in progress for this project, resuming...")
+
+        if (tracker?.status === "polling") {
+          setDeploymentStatus("polling")
+          startPollingDeploymentStatus()
+        } else {
+          setDeploymentStatus("loading")
+          // Check if we should transition to polling
+          setTimeout(() => {
+            if (isDeploymentCreationInProgress(projectId)) {
+              setDeploymentStatus("polling")
+              startPollingDeploymentStatus()
+            }
+          }, 5000) // Give it 5 seconds then start polling
+        }
         return
       }
 
@@ -177,42 +244,59 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
           setExistingDeployment(data.deployment)
           setDeploymentAlias(data.deployment.deployment_url)
           setDeploymentStatus("success")
-          // Clear any in-progress tracking since we found a completed deployment
-          setDeploymentCreationInProgress(false)
-          deploymentCreationRef.current = null
+          // Clear any stale tracking since we found a completed deployment
+          clearDeploymentCreationTracker(projectId)
           return
         }
       } else if (response.status === 404) {
-        // No existing deployment found - create a new one only if not already in progress
-        console.log("No existing deployment found, creating new deployment...")
-        return createDeployment()
+        // No existing deployment found - check if we should create a new one
+        console.log("No existing deployment found, checking if we should create new deployment...")
+
+        // Double-check that no deployment creation is in progress after the API call
+        if (!isDeploymentCreationInProgress(projectId)) {
+          return createDeployment()
+        } else {
+          console.log("Deployment creation started by another process, resuming polling...")
+          setDeploymentStatus("polling")
+          startPollingDeploymentStatus()
+        }
       } else {
-        // Other error - try to create deployment anyway
+        // Other error - only try to create deployment if not already in progress
         console.error("Error checking existing deployment:", await response.text())
-        return createDeployment()
+        if (!isDeploymentCreationInProgress(projectId)) {
+          return createDeployment()
+        }
       }
     } catch (error) {
       console.error("Error checking existing deployment:", error)
-      // If any error occurs, try to create a deployment
-      return createDeployment()
+      // If any error occurs, only try to create a deployment if not already in progress
+      if (!isDeploymentCreationInProgress(projectId)) {
+        return createDeployment()
+      }
     }
   }
 
   // Create a new deployment
   const createDeployment = async () => {
     try {
-      // Prevent duplicate deployment creation requests
-      if (deploymentCreationInProgress && deploymentCreationRef.current === projectId) {
-        console.log("Deployment creation already in progress for this project, skipping...")
-        setDeploymentStatus("polling")
-        startPollingDeploymentStatus()
+      // Final check to prevent duplicate deployment creation requests
+      if (isDeploymentCreationInProgress(projectId)) {
+        console.log("Deployment creation already in progress for this project, aborting duplicate request...")
+        const tracker = getDeploymentCreationTracker()
+        if (tracker?.status === "polling") {
+          setDeploymentStatus("polling")
+          startPollingDeploymentStatus()
+        } else {
+          setDeploymentStatus("loading")
+        }
         return
       }
 
       setError(null)
       setDeploymentStatus("loading")
-      setDeploymentCreationInProgress(true)
-      deploymentCreationRef.current = projectId
+
+      // Mark deployment creation as in progress BEFORE making the API call
+      setDeploymentCreationTracker(projectId, "creating")
 
       console.log("Creating new deployment for project:", projectId)
 
@@ -245,7 +329,8 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
 
       // Check if deployment was scheduled successfully
       if (data.status === "scheduled" || response.status === 200) {
-        // Start polling for deployment status
+        // Update tracker to polling status and start polling
+        setDeploymentCreationTracker(projectId, "polling")
         setDeploymentStatus("polling")
         startPollingDeploymentStatus()
       } else {
@@ -255,14 +340,19 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
       console.error("Error creating deployment:", error)
       setError((error as Error).message || "Failed to create deployment")
       setDeploymentStatus("error")
-      // Clear in-progress tracking on error
-      setDeploymentCreationInProgress(false)
-      deploymentCreationRef.current = null
+      // Clear tracking on error
+      clearDeploymentCreationTracker(projectId)
     }
   }
 
   // Poll deployment status
   const startPollingDeploymentStatus = () => {
+    // Clear any existing polling interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+
     const pollStatus = async () => {
       try {
         console.log("Polling deployment status for project:", projectId)
@@ -298,6 +388,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
           }
           setError("Deployment failed. Please try again.")
           setDeploymentStatus("error")
+          clearDeploymentCreationTracker(projectId)
         }
         // If status is "processing", continue polling
       } catch (error) {
@@ -327,9 +418,8 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
           setExistingDeployment(data.deployment)
           setDeploymentAlias(data.deployment.deployment_url)
           setDeploymentStatus("success")
-          // Clear in-progress tracking since deployment is complete
-          setDeploymentCreationInProgress(false)
-          deploymentCreationRef.current = null
+          // Clear tracking since deployment is complete
+          clearDeploymentCreationTracker(projectId)
           return
         }
       }
@@ -339,9 +429,8 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
       console.error("Error fetching completed deployment:", error)
       setError((error as Error).message || "Failed to fetch deployment data")
       setDeploymentStatus("error")
-      // Clear in-progress tracking on error
-      setDeploymentCreationInProgress(false)
-      deploymentCreationRef.current = null
+      // Clear tracking on error
+      clearDeploymentCreationTracker(projectId)
     }
   }
 
@@ -371,14 +460,19 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   }
 
   const handleRedeploy = () => {
-    // Reset state and trigger a new deployment
+    // Reset state and clear any existing tracking
     setDeploymentStatus("loading")
     setExistingDeployment(null)
     setDeploymentAlias(null)
     setError(null)
-    // Clear any previous deployment creation tracking
-    setDeploymentCreationInProgress(false)
-    deploymentCreationRef.current = null
+    // Clear any previous deployment creation tracking to allow redeployment
+    clearDeploymentCreationTracker(projectId)
+    // Clear any polling intervals
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+    // Trigger new deployment
     createDeployment()
   }
 
