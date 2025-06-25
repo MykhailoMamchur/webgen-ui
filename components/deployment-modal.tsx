@@ -5,7 +5,7 @@ import { X, Check, ExternalLink, Loader2, Globe, Copy, ChevronRight } from "luci
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/components/ui/use-toast"
 import DomainSettingsModal from "./domain-settings-modal"
 
 interface DeploymentModalProps {
@@ -35,8 +35,10 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<boolean>(false)
   const [isDomainModalOpen, setIsDomainModalOpen] = useState(false)
+  const [isDeletingDomain, setIsDeletingDomain] = useState(false)
   const initialLoadRef = useRef(true)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const { toast } = useToast()
 
   // Update the useEffect to handle initial loading
   useEffect(() => {
@@ -304,50 +306,92 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     setIsDomainModalOpen(true)
   }
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+  const handleDeleteDomain = async () => {
+    if (!existingDeployment?.domain) return
+
+    try {
+      setIsDeletingDomain(true)
+
+      const response = await fetch(`/api/deployment/domain?project_id=${projectId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.ok) {
+        // Update the existing deployment to remove domain info
+        setExistingDeployment((prev) =>
+          prev
+            ? {
+                ...prev,
+                domain: null,
+                domain_status: null,
+              }
+            : null,
+        )
+
+        toast({
+          title: "Domain removed",
+          description: "Custom domain has been successfully removed from your deployment.",
+        })
+      } else if (response.status === 403) {
+        toast({
+          title: "Permission denied",
+          description: "You don't have permission to delete this domain.",
+          variant: "destructive",
+        })
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        toast({
+          title: "Failed to delete domain",
+          description: errorData.error || "An error occurred while deleting the domain.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error deleting domain:", error)
+      toast({
+        title: "Failed to delete domain",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeletingDomain(false)
+    }
   }
 
-  const getDomainStatusBadge = (status: string | null) => {
-    if (!status) return null
+  const getDomainStatusText = (status: string | null) => {
+    if (!status) return ""
 
     switch (status) {
       case "PROVISIONED":
-        return (
-          <Badge variant="default" className="bg-green-900/30 text-green-400 border-green-500/30">
-            Active
-          </Badge>
-        )
+        return "Active"
       case "DNS_VERIFIED":
-        return (
-          <Badge variant="default" className="bg-blue-900/30 text-blue-400 border-blue-500/30">
-            Verified
-          </Badge>
-        )
+        return "Verified"
       case "DNS_PENDING":
-        return (
-          <Badge variant="default" className="bg-yellow-900/30 text-yellow-400 border-yellow-500/30">
-            Pending
-          </Badge>
-        )
+        return "Pending"
       case "PROVISION_ERROR":
-        return (
-          <Badge variant="destructive" className="bg-red-900/30 text-red-400 border-red-500/30">
-            Error
-          </Badge>
-        )
+        return "Error"
       default:
-        return (
-          <Badge variant="secondary" className="bg-gray-900/30 text-gray-400 border-gray-500/30">
-            Unknown
-          </Badge>
-        )
+        return "Unknown"
+    }
+  }
+
+  const getDomainStatusColor = (status: string | null) => {
+    if (!status) return "text-gray-400"
+
+    switch (status) {
+      case "PROVISIONED":
+        return "text-green-400"
+      case "DNS_VERIFIED":
+        return "text-blue-400"
+      case "DNS_PENDING":
+        return "text-yellow-400"
+      case "PROVISION_ERROR":
+        return "text-red-400"
+      default:
+        return "text-gray-400"
     }
   }
 
@@ -461,35 +505,6 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                 </div>
               </div>
 
-              {/* Show deployment info if we have existing deployment data */}
-              {existingDeployment && (
-                <div className="mb-5">
-                  <div className="bg-[#13111C] border border-gray-800 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-400">Created</span>
-                      <span className="text-xs text-gray-300">{formatDate(existingDeployment.created_at)}</span>
-                    </div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-400">Last Updated</span>
-                      <span className="text-xs text-gray-300">{formatDate(existingDeployment.updated_at)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">Custom Domain</span>
-                      <div className="flex items-center gap-2">
-                        {existingDeployment.domain ? (
-                          <>
-                            <span className="text-xs text-gray-300">{existingDeployment.domain}</span>
-                            {getDomainStatusBadge(existingDeployment.domain_status)}
-                          </>
-                        ) : (
-                          <span className="text-xs text-gray-500">Not configured</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div className="mb-5">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm text-gray-400">Publication URL</h3>
@@ -527,17 +542,43 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                 <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-[#13111C] border border-gray-800">
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-white">Set a custom domain</span>
+                    {existingDeployment?.domain ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-white">{existingDeployment.domain}</span>
+                        <span className={`text-xs ${getDomainStatusColor(existingDeployment.domain_status)}`}>
+                          {getDomainStatusText(existingDeployment.domain_status)}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-white">Set a custom domain</span>
+                    )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDomainSettings}
-                    className="text-gray-400 hover:text-white h-7 px-2"
-                  >
-                    Configure
-                    <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                  </Button>
+                  {existingDeployment?.domain ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDeleteDomain}
+                      disabled={isDeletingDomain}
+                      className="text-gray-400 hover:text-red-400 h-7 w-7 p-0"
+                      title="Remove domain"
+                    >
+                      {isDeletingDomain ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <X className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDomainSettings}
+                      className="text-gray-400 hover:text-white h-7 px-2"
+                    >
+                      Configure
+                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  )}
                 </div>
               </div>
 

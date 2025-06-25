@@ -1,55 +1,97 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { cookies } from "next/headers"
 import { API_BASE_URL } from "@/lib/config"
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    // Get project_id from query parameters
+    const cookieStore = await cookies()
+    const accessToken = cookieStore.get("access_token")?.value
+
+    if (!accessToken) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { project_id, domain } = body
+
+    if (!project_id || !domain) {
+      return NextResponse.json({ error: "project_id and domain are required" }, { status: 400 })
+    }
+
+    console.log(`Setting up domain ${domain} for project ${project_id}`)
+
+    const response = await fetch(`${API_BASE_URL}/deployment/domain`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        project_id,
+        domain,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error("Domain setup failed:", errorData)
+      return NextResponse.json(
+        { error: errorData.error || `Domain setup failed: ${response.status}` },
+        { status: response.status },
+      )
+    }
+
+    const data = await response.json()
+    console.log("Domain setup successful:", data)
+
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error("Error setting up domain:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const cookieStore = await cookies()
+    const accessToken = cookieStore.get("access_token")?.value
+
+    if (!accessToken) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get("project_id")
 
-    // Get the access token from the request cookies
-    const accessToken = request.cookies.get("access_token")?.value
-
-    // Validate the project ID
     if (!projectId) {
-      return NextResponse.json({ error: "Project ID is required" }, { status: 400 })
+      return NextResponse.json({ error: "project_id is required" }, { status: 400 })
     }
 
-    // Forward the request to the external API using the environment-specific base URL
-    const response = await fetch(`${API_BASE_URL}/deployment?project_id=${projectId}`, {
-      method: "GET",
+    console.log(`Deleting domain for project ${projectId}`)
+
+    const response = await fetch(`${API_BASE_URL}/deployment/domain?project_id=${projectId}`, {
+      method: "DELETE",
       headers: {
         "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        Authorization: `Bearer ${accessToken}`,
       },
     })
 
-    // Check if the response is successful
     if (!response.ok) {
-      if (response.status === 404) {
-        // No deployment found - this is expected for new projects
-        return NextResponse.json({ error: "No deployment found" }, { status: 404 })
-      }
-
-      const errorText = await response.text()
-      console.error(`External API error (${response.status}):`, errorText)
-
-      // Try to parse as JSON, but handle text responses too
-      let errorData
-      try {
-        errorData = JSON.parse(errorText)
-      } catch (e) {
-        errorData = { error: errorText || `External API returned ${response.status}` }
-      }
-
-      return NextResponse.json(errorData, { status: response.status })
+      const errorData = await response.json().catch(() => ({}))
+      console.error("Domain deletion failed:", errorData)
+      return NextResponse.json(
+        { error: errorData.error || `Domain deletion failed: ${response.status}` },
+        { status: response.status },
+      )
     }
 
-    // Return the response from the external API
     const data = await response.json()
+    console.log("Domain deletion successful:", data)
+
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in deployment GET API:", error)
+    console.error("Error deleting domain:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
