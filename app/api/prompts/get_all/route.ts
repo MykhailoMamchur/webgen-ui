@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { API_BASE_URL } from "@/lib/config"
 
 export async function POST(request: Request) {
   try {
     // Get the auth token from cookies
-    const cookieStore = cookies()
-    const token = cookieStore.get("access_token")?.value
+    const token = request.cookies.get("access_token")?.value
 
     if (!token) {
       console.error("No authentication token found in cookies")
