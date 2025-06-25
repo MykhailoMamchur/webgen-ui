@@ -19,8 +19,8 @@ interface ExistingDeployment {
   deployment_url: string
   created_at: number
   updated_at: number
-  domain: string
-  domain_status: "DNS_PENDING" | "DNS_VERIFIED" | "PROVISIONED" | "PROVISION_ERROR"
+  domain: string | null
+  domain_status: "DNS_PENDING" | "DNS_VERIFIED" | "PROVISIONED" | "PROVISION_ERROR" | null
 }
 
 interface DeploymentStatus {
@@ -314,7 +314,9 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     })
   }
 
-  const getDomainStatusBadge = (status: string) => {
+  const getDomainStatusBadge = (status: string | null) => {
+    if (!status) return null
+
     switch (status) {
       case "PROVISIONED":
         return (
@@ -471,15 +473,19 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                       <span className="text-xs text-gray-400">Last Updated</span>
                       <span className="text-xs text-gray-300">{formatDate(existingDeployment.updated_at)}</span>
                     </div>
-                    {existingDeployment.domain && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-400">Custom Domain</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-300">{existingDeployment.domain}</span>
-                          {getDomainStatusBadge(existingDeployment.domain_status)}
-                        </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400">Custom Domain</span>
+                      <div className="flex items-center gap-2">
+                        {existingDeployment.domain ? (
+                          <>
+                            <span className="text-xs text-gray-300">{existingDeployment.domain}</span>
+                            {getDomainStatusBadge(existingDeployment.domain_status)}
+                          </>
+                        ) : (
+                          <span className="text-xs text-gray-500">Not configured</span>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               )}
