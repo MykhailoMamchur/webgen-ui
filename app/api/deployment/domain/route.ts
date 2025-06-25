@@ -50,3 +50,48 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const cookieStore = await cookies()
+    const accessToken = cookieStore.get("access_token")?.value
+
+    if (!accessToken) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get("project_id")
+
+    if (!projectId) {
+      return NextResponse.json({ error: "project_id is required" }, { status: 400 })
+    }
+
+    console.log(`Deleting domain for project ${projectId}`)
+
+    const response = await fetch(`${API_BASE_URL}/deployment/domain?project_id=${projectId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error("Domain deletion failed:", errorData)
+      return NextResponse.json(
+        { error: errorData.error || `Domain deletion failed: ${response.status}` },
+        { status: response.status },
+      )
+    }
+
+    const data = await response.json()
+    console.log("Domain deletion successful:", data)
+
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error("Error deleting domain:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
