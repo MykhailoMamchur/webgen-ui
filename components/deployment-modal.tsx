@@ -148,7 +148,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
       setError(null)
 
       // First, check if there's an existing deployment
-      const response = await fetch(`/api/deployment?project_id=${projectId}`, {
+      const response = await fetch(`/api/deployment/${projectId}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -156,7 +156,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
       })
 
       if (response.ok) {
-        // Existing deployment found
+        // Existing deployment found (200 status)
         const data = await response.json()
         if (data.status === "success" && data.deployment) {
           setExistingDeployment(data.deployment)
@@ -165,66 +165,16 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
           return
         }
       } else if (response.status === 404) {
-        // No existing deployment, proceed with alias check and creation
-        return getDeploymentAlias()
+        // No existing deployment found - create a new one
+        console.log("No existing deployment found, creating new deployment...")
+        return createDeployment()
       } else {
-        // Other error, try to proceed with creation anyway
+        // Other error - try to create deployment anyway
         console.error("Error checking existing deployment:", await response.text())
-        return getDeploymentAlias()
+        return createDeployment()
       }
     } catch (error) {
       console.error("Error checking existing deployment:", error)
-      // If any error occurs, try to proceed with creation
-      return getDeploymentAlias()
-    }
-  }
-
-  // Check if deployment already exists (legacy flow)
-  const getDeploymentAlias = async () => {
-    try {
-      setDeploymentStatus("loading")
-      setError(null)
-
-      // Call the deployment/alias API to check if deployment already exists
-      const response = await fetch("/api/deployment/alias", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          project_id: projectId,
-          alias_type: "prod",
-        }),
-      })
-
-      // Check if the response is JSON
-      const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text()
-        console.error("Non-JSON response:", text)
-        // If alias check fails, try to create a deployment
-        return createDeployment()
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error("Error checking alias:", errorData)
-        // If alias check fails, try to create a deployment
-        return createDeployment()
-      }
-
-      const data = await response.json()
-
-      if (data.alias) {
-        setDeploymentAlias(data.alias)
-        setDeploymentStatus("success")
-      } else {
-        console.error("No alias in response:", data)
-        // If no alias is returned, try to create a deployment
-        return createDeployment()
-      }
-    } catch (error) {
-      console.error("Error getting deployment alias:", error)
       // If any error occurs, try to create a deployment
       return createDeployment()
     }
@@ -235,6 +185,8 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     try {
       setError(null)
       setDeploymentStatus("loading")
+
+      console.log("Creating new deployment for project:", projectId)
 
       // Call the deployment creation API
       const response = await fetch("/api/deployment", {
@@ -260,9 +212,17 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
         throw new Error(errorData.error || `Failed to create deployment: ${response.status}`)
       }
 
-      // After successful deployment creation, start polling for status
-      setDeploymentStatus("polling")
-      startPollingDeploymentStatus()
+      const data = await response.json()
+      console.log("Deployment creation response:", data)
+
+      // Check if deployment was scheduled successfully
+      if (data.status === "scheduled" || response.status === 200) {
+        // Start polling for deployment status
+        setDeploymentStatus("polling")
+        startPollingDeploymentStatus()
+      } else {
+        throw new Error("Unexpected response from deployment creation")
+      }
     } catch (error) {
       console.error("Error creating deployment:", error)
       setError((error as Error).message || "Failed to create deployment")
@@ -274,6 +234,8 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   const startPollingDeploymentStatus = () => {
     const pollStatus = async () => {
       try {
+        console.log("Polling deployment status for project:", projectId)
+
         const response = await fetch(`/api/deployment/status/${projectId}`, {
           method: "GET",
           headers: {
@@ -286,14 +248,17 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
         }
 
         const data: DeploymentStatus = await response.json()
+        console.log("Deployment status:", data)
 
         if (data.status === "completed") {
-          // Stop polling and get the final alias
+          // Stop polling and fetch the final deployment data
           if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current)
             pollingIntervalRef.current = null
           }
-          await getFinalDeploymentAlias()
+
+          // Fetch the completed deployment data
+          await fetchCompletedDeployment()
         } else if (data.status === "failed") {
           // Stop polling and show error
           if (pollingIntervalRef.current) {
@@ -315,35 +280,30 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     pollingIntervalRef.current = setInterval(pollStatus, 15000)
   }
 
-  // Get the final deployment alias after completion
-  const getFinalDeploymentAlias = async () => {
+  // Fetch the completed deployment data
+  const fetchCompletedDeployment = async () => {
     try {
-      const response = await fetch("/api/deployment/alias", {
-        method: "POST",
+      const response = await fetch(`/api/deployment/${projectId}`, {
+        method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          project_id: projectId,
-          alias_type: "prod",
-        }),
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to get deployment alias: ${response.status}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.status === "success" && data.deployment) {
+          setExistingDeployment(data.deployment)
+          setDeploymentAlias(data.deployment.deployment_url)
+          setDeploymentStatus("success")
+          return
+        }
       }
 
-      const data = await response.json()
-
-      if (data.alias) {
-        setDeploymentAlias(data.alias)
-        setDeploymentStatus("success")
-      } else {
-        throw new Error("No alias returned after deployment completion")
-      }
+      throw new Error("Failed to fetch completed deployment data")
     } catch (error) {
-      console.error("Error getting final deployment alias:", error)
-      setError((error as Error).message || "Failed to get deployment alias")
+      console.error("Error fetching completed deployment:", error)
+      setError((error as Error).message || "Failed to fetch deployment data")
       setDeploymentStatus("error")
     }
   }
