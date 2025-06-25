@@ -21,7 +21,7 @@ interface ExistingDeployment {
   created_at: number
   updated_at: number
   domain: string | null
-  domain_status: "DNS_PENDING" | "DNS_VERIFIED" | "PROVISIONED" | "PROVISION_ERROR" | null
+  domain_status: "DNS_PENDING" | "DNS_VERIFIED" | "PROVISIONED" | "PROVISION_ERROR" | "DELETING" | null
 }
 
 interface DeploymentStatus {
@@ -41,6 +41,11 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   const initialLoadRef = useRef(true)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
+
+  // Helper function to check if domain should be ignored
+  const shouldIgnoreDomain = (deployment: ExistingDeployment | null) => {
+    return !deployment?.domain || deployment.domain_status === "DELETING"
+  }
 
   // Update the useEffect to handle initial loading
   useEffect(() => {
@@ -277,9 +282,10 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   }
 
   const handleOpenDeployment = () => {
-    const url = existingDeployment?.domain
-      ? `https://${existingDeployment.domain}`
-      : existingDeployment?.deployment_url || deploymentAlias
+    const url =
+      !shouldIgnoreDomain(existingDeployment) && existingDeployment?.domain
+        ? `https://${existingDeployment.domain}`
+        : existingDeployment?.deployment_url || deploymentAlias
     if (url) {
       // Ensure the URL has https:// prefix
       const finalUrl = url.startsWith("http") ? url : `https://${url}`
@@ -288,9 +294,10 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   }
 
   const handleCopyUrl = () => {
-    const url = existingDeployment?.domain
-      ? `https://${existingDeployment.domain}`
-      : existingDeployment?.deployment_url || deploymentAlias
+    const url =
+      !shouldIgnoreDomain(existingDeployment) && existingDeployment?.domain
+        ? `https://${existingDeployment.domain}`
+        : existingDeployment?.deployment_url || deploymentAlias
     if (url) {
       const finalUrl = url.startsWith("http") ? url : `https://${url}`
       navigator.clipboard.writeText(finalUrl)
@@ -317,7 +324,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   }
 
   const handleConfirmDeleteDomain = async () => {
-    if (!existingDeployment?.domain) return
+    if (!existingDeployment?.domain || shouldIgnoreDomain(existingDeployment)) return
 
     try {
       setIsDeletingDomain(true)
@@ -373,7 +380,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   }
 
   const getDomainStatusBadge = (status: string | null) => {
-    if (!status) return null
+    if (!status || status === "DELETING") return null
 
     switch (status) {
       case "PROVISIONED":
@@ -409,9 +416,10 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
     }
   }
 
-  const displayUrl = existingDeployment?.domain
-    ? `https://${existingDeployment.domain}`
-    : existingDeployment?.deployment_url || deploymentAlias
+  const displayUrl =
+    !shouldIgnoreDomain(existingDeployment) && existingDeployment?.domain
+      ? `https://${existingDeployment.domain}`
+      : existingDeployment?.deployment_url || deploymentAlias
 
   return (
     <>
@@ -558,7 +566,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                 <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-[#13111C] border border-gray-800">
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-gray-400" />
-                    {existingDeployment?.domain ? (
+                    {!shouldIgnoreDomain(existingDeployment) && existingDeployment?.domain ? (
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-white">{existingDeployment.domain}</span>
                         {getDomainStatusBadge(existingDeployment.domain_status)}
@@ -567,7 +575,7 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                       <span className="text-sm text-white">Set a custom domain</span>
                     )}
                   </div>
-                  {existingDeployment?.domain ? (
+                  {!shouldIgnoreDomain(existingDeployment) && existingDeployment?.domain ? (
                     <Button
                       variant="ghost"
                       size="sm"
