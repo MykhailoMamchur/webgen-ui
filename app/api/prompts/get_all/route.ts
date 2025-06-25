@@ -1,51 +1,51 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
 import { API_BASE_URL } from "@/lib/config"
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    // Get the request body
-    const body = await request.json()
-    const { project_id } = body
+    // Get the auth token from cookies
+    const cookieStore = cookies()
+    const token = cookieStore.get("access_token")?.value
 
-    // Get the access token from the request cookies
-    const accessToken = request.cookies.get("access_token")?.value
-
-    // Validate the project ID
-    if (!project_id) {
-      return NextResponse.json({ error: "Project ID is required" }, { status: 400 })
+    if (!token) {
+      console.error("No authentication token found in cookies")
+      return NextResponse.json({ status: "error", error: "Authentication required" }, { status: 401 })
     }
 
-    // Forward the request to the external API using the environment-specific base URL
-    const response = await fetch(`${API_BASE_URL}/deployment`, {
+    console.log("Getting all prompts with token:", token.substring(0, 10) + "...")
+
+    // Forward the request to the backend API with the auth token using the environment-specific base URL
+    const response = await fetch(`${API_BASE_URL}/prompts/get_all`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ project_id }),
     })
 
-    // Check if the response is successful
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`External API error (${response.status}):`, errorText)
+    // Log the response body for debugging
+    const responseText = await response.text()
 
-      // Try to parse as JSON, but handle text responses too
-      let errorData
-      try {
-        errorData = JSON.parse(errorText)
-      } catch (e) {
-        errorData = { error: errorText || `External API returned ${response.status}` }
-      }
-
-      return NextResponse.json(errorData, { status: response.status })
+    // Parse the response as JSON
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (e) {
+      console.error("Error parsing JSON response:", e)
+      return NextResponse.json({ status: "error", error: "Invalid response from server" }, { status: 500 })
     }
 
-    // Return the response from the external API
-    const data = await response.json()
+    if (!response.ok) {
+      return NextResponse.json(
+        { status: "error", error: data.error || "Failed to get prompts" },
+        { status: response.status },
+      )
+    }
+
     return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in deployment POST API:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Error getting prompts:", error)
+    return NextResponse.json({ status: "error", error: "Internal server error" }, { status: 500 })
   }
 }
