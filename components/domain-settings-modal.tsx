@@ -109,7 +109,7 @@ export default function DomainSettingsModal({ isOpen, onClose, projectId, projec
   const startDomainStatusPolling = () => {
     const pollDomainStatus = async () => {
       try {
-        const response = await fetch(`/api/deployment?project_id=${projectId}`, {
+        const response = await fetch(`/api/deployment/${projectId}`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
