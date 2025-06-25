@@ -29,6 +29,14 @@ interface DeploymentStatus {
   [key: string]: any
 }
 
+// Add TierData interface if not already present
+interface TierData {
+  user_id: string
+  tier_type: string
+  edits_left: number
+  renewal_at: number
+}
+
 export default function DeploymentModal({ isOpen, onClose, projectId, projectName }: DeploymentModalProps) {
   const [deploymentStatus, setDeploymentStatus] = useState<"idle" | "loading" | "polling" | "success" | "error">("idle")
   const [existingDeployment, setExistingDeployment] = useState<ExistingDeployment | null>(null)
@@ -42,16 +50,75 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
 
+  // Add tier data state
+  const [tierData, setTierData] = useState<TierData | null>(null)
+
+  // Add function to fetch user tier data
+  const fetchUserTierData = async () => {
+    try {
+      const response = await fetch("/api/user/tier", {
+        method: "GET",
+        credentials: "include",
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.status === "success" && data.tier_data) {
+          setTierData(data.tier_data)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user tier data:", error)
+    }
+  }
+
+  // Add handleUpgrade function (same as in header)
+  const handleUpgrade = async () => {
+    try {
+      // Fetch user data before redirecting
+      const response = await fetch("/api/auth/me", {
+        method: "GET",
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch user data")
+      }
+
+      const fetchedUserData = await response.json()
+
+      if (!fetchedUserData.email || !fetchedUserData.id) {
+        throw new Error("User information is incomplete")
+      }
+
+      // Get current path for return URL
+      const currentPath = window.location.pathname + window.location.search
+
+      // Redirect to root domain with user data as URL parameters
+      const subscribeUrl = new URL("https://usemanufactura.com/subscribe")
+      subscribeUrl.searchParams.set("email", fetchedUserData.email)
+      subscribeUrl.searchParams.set("userId", fetchedUserData.id)
+      subscribeUrl.searchParams.set("returnUrl", `${window.location.origin}${currentPath}`)
+
+      window.location.href = subscribeUrl.toString()
+    } catch (error) {
+      console.error("Error preparing upgrade:", error)
+      // Fallback to external pricing page
+      window.open("https://usemanufactura.com/pricing", "_blank")
+    }
+  }
+
   // Helper function to check if domain should be ignored
   const shouldIgnoreDomain = (deployment: ExistingDeployment | null) => {
     return !deployment?.domain || deployment.domain_status === "DELETING"
   }
 
-  // Update the useEffect to handle initial loading
+  // Update the useEffect to handle initial loading and fetch tier data
   useEffect(() => {
     if (isOpen && projectId && initialLoadRef.current) {
       initialLoadRef.current = false
       checkExistingDeployment()
+      fetchUserTierData() // Add this line
     }
 
     // Reset the ref when modal closes
@@ -465,10 +532,22 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                     <Globe className="h-4 w-4 text-gray-400" />
                     <span className="text-sm text-white">Set a custom domain</span>
                   </div>
-                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white h-7 px-2" disabled>
-                    Configure
-                    <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                  </Button>
+                  {tierData?.tier_type === "FREE" ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleUpgrade}
+                      className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors hover:bg-emerald-500/20 h-7 px-2"
+                    >
+                      Upgrade Plan
+                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white h-7 px-2" disabled>
+                      Configure
+                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -589,6 +668,16 @@ export default function DeploymentModal({ isOpen, onClose, projectId, projectNam
                       ) : (
                         <X className="h-3.5 w-3.5" />
                       )}
+                    </Button>
+                  ) : tierData?.tier_type === "FREE" ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleUpgrade}
+                      className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors hover:bg-emerald-500/20 h-7 px-2"
+                    >
+                      Upgrade Plan
+                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
                     </Button>
                   ) : (
                     <Button
