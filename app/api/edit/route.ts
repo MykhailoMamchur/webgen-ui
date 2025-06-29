@@ -82,22 +82,47 @@ export async function POST(request: NextRequest) {
       throw new Error("No response stream from API")
     }
 
-    // Create a custom readable stream that ensures proper streaming
+    // Create a custom readable stream that handles __WEBGEN_EOF__ marker
     const readableStream = new ReadableStream({
       start(controller) {
         const reader = stream.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
 
         function pump(): Promise<void> {
           return reader
             .read()
             .then(({ done, value }) => {
               if (done) {
+                // If there's remaining content in buffer, send it
+                if (buffer.trim()) {
+                  controller.enqueue(new TextEncoder().encode(buffer))
+                }
                 controller.close()
                 return
               }
 
-              // Enqueue the chunk immediately
-              controller.enqueue(value)
+              // Decode the chunk and add to buffer
+              const chunk = decoder.decode(value, { stream: true })
+              buffer += chunk
+
+              // Check for __WEBGEN_EOF__ marker
+              const eofIndex = buffer.indexOf("__WEBGEN_EOF__")
+              if (eofIndex !== -1) {
+                // Send everything before the EOF marker
+                const finalContent = buffer.substring(0, eofIndex)
+                if (finalContent) {
+                  controller.enqueue(new TextEncoder().encode(finalContent))
+                }
+                // Close the stream - we've reached the end
+                controller.close()
+                return
+              }
+
+              // Send the current buffer content
+              controller.enqueue(new TextEncoder().encode(buffer))
+              buffer = "" // Clear buffer after sending
+
               return pump()
             })
             .catch((error) => {
